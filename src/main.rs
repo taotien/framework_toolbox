@@ -4,6 +4,7 @@ use iced::widget::{
     button, column, container, horizontal_rule, horizontal_space, row, slider, text, toggler,
 };
 use iced::{alignment, window, Alignment, Color, Length, Sandbox, Settings};
+
 use serde::Deserialize;
 
 pub fn main() -> iced::Result {
@@ -16,10 +17,6 @@ pub fn main() -> iced::Result {
         ..Settings::default()
     })
 }
-
-// ectool fwchargelimit
-// ectool fan_duty
-// ectool autofanctrl
 
 #[derive(Deserialize)]
 struct Toolbox {
@@ -34,8 +31,8 @@ pub enum Message {
     BatteryLimitChanged(u8),
     FanDutyChanged(u8),
     FanAutoToggled(bool),
-    Apply,
     // BacklightAutoToggled { value: bool },
+    Apply,
 }
 
 impl Sandbox for Toolbox {
