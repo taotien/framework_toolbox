@@ -1,17 +1,27 @@
 # Framework Toolbox
 
-A simple GUI for various utilites useful on Framework laptops.
+Quick and dirty GUI for utilities of the Framework Laptop
 
-## External Dependencies
+## Installation
 
+Note: **I am new to rust, please look through the code and taste the spaghetti
+before installation**
+
+```sh
+cargo install --git "https://github.com/taotien/framework_toolbox.git"
+```
+
+## Dependencies
+
+- rust
 - ectool
+- iio-sensor-proxy
 - Polkit/pkexec
 
 ## TODO/Need help
 
 - make purty
-- better way of runnning elevated
 - tray icon
-- installable
-- iio-sensor-proxy
-- somehow capture F7/F8 presses to jank re-enable manual brightness while using ambient light sensor
+- check for iio-sensor-proxy
+- somehow capture F7/F8 presses to jank re-enable manual brightness while using
+  ambient light sensor
