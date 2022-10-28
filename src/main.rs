@@ -41,8 +41,9 @@ impl Sandbox for Toolbox {
 
     fn new() -> Self {
         let config_exists = false;
+        println!("running in {}", std::env::current_dir().unwrap().display());
         let mut daemon = Command::new("pkexec")
-            .arg("/home/tao/Projects/framework_toolbox/target/debug/daemon")
+            .arg("fwtbd")
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -72,34 +73,31 @@ impl Sandbox for Toolbox {
         match message {
             Message::BatteryLimitChanged(value) => {
                 self.battery_limit = value;
-                write!(self.daemon, "charge\n{}\n", self.battery_limit)
+                writeln!(self.daemon, "charge\n{}", self.battery_limit)
                     .expect("couldn't write to daemon");
             }
             Message::FanDutyChanged(value) => {
                 self.fan_duty = value;
                 self.fan_auto = false;
-                write!(self.daemon, "fan\n{}\n", self.fan_duty).expect("couldn't write to daemon");
+                writeln!(self.daemon, "fan\n{}", self.fan_duty).expect("couldn't write to daemon");
             }
             Message::FanAutoToggled(value) => {
                 self.fan_auto = value;
-                if value == false {
-                    write!(self.daemon, "fan\n{}\n", self.fan_duty)
+                if !value {
+                    writeln!(self.daemon, "fan\n{}", self.fan_duty)
                         .expect("couldn't write to daemon");
                 } else {
-                    write!(self.daemon, "autofan\n").expect("couldn't write to daemon");
+                    writeln!(self.daemon, "autofan").expect("couldn't write to daemon");
                 }
             }
             Message::BacklightChanged(value) => {
                 self.backlight = value;
                 self.backlight_auto = false;
-                write!(self.daemon, "backlight\n{}\n", value).expect("couldn't write to daemon");
+                writeln!(self.daemon, "backlight\n{}", value).expect("couldn't write to daemon");
             }
             Message::BacklightAutoToggled(value) => {
                 self.backlight_auto = value;
-            } // Message::Apply => {
-              //     let mut stdin = self.daemon_handle.stdin.take().expect("couldn't take stdin of daemon");
-              //     stdin.write_all();
-              // }
+            }
         }
     }
 

@@ -3,9 +3,15 @@ name = "framework_toolbox"
 version = "0.1.0"
 edition = "2021"
 
-default-run = "framework_toolbox"
+default-run = "fwtb"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "fwtb"
+path = "src/main.rs"
+
+[[bin]]
+name = "fwtbd"
+path = "src/bin/daemon.rs"
 
 [dependencies]
 iced = { git = "https://github.com/iced-rs/iced", rev = "77c8380", features = ["tokio"] }
