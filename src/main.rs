@@ -1,11 +1,10 @@
-use std::process::Command;
+use std::io::Write;
+use std::process::{ChildStdin, Command, Stdio};
 
 use iced::widget::{
-    button, column, container, horizontal_rule, horizontal_space, row, slider, text, toggler,
+    column, container, horizontal_rule, horizontal_space, row, slider, text, toggler,
 };
 use iced::{alignment, window, Alignment, Color, Length, Sandbox, Settings};
-
-use serde::Deserialize;
 
 pub fn main() -> iced::Result {
     Toolbox::run(Settings {
@@ -18,12 +17,13 @@ pub fn main() -> iced::Result {
     })
 }
 
-#[derive(Deserialize)]
 struct Toolbox {
     battery_limit: u8,
     fan_duty: u8,
     fan_auto: bool,
-    // backlight_auto: bool,
+    backlight: u32,
+    backlight_auto: bool,
+    daemon: ChildStdin,
 }
 
 #[derive(Clone, Debug)]
@@ -31,8 +31,9 @@ pub enum Message {
     BatteryLimitChanged(u8),
     FanDutyChanged(u8),
     FanAutoToggled(bool),
-    // BacklightAutoToggled { value: bool },
-    Apply,
+    BacklightChanged(u32),
+    BacklightAutoToggled(bool),
+    // Apply,
 }
 
 impl Sandbox for Toolbox {
@@ -40,6 +41,15 @@ impl Sandbox for Toolbox {
 
     fn new() -> Self {
         let config_exists = false;
+        let mut daemon = Command::new("pkexec")
+            .arg("/home/tao/Projects/framework_toolbox/target/debug/daemon")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("failed to open daemon");
+        let daemon_stdin = daemon.stdin.take().expect("couldn't take stdin of daemon");
+
         if config_exists {
             todo!()
         } else {
@@ -47,6 +57,9 @@ impl Sandbox for Toolbox {
                 battery_limit: 69,
                 fan_duty: 42,
                 fan_auto: true,
+                backlight: 48000,
+                backlight_auto: true,
+                daemon: daemon_stdin,
             }
         }
     }
@@ -59,34 +72,34 @@ impl Sandbox for Toolbox {
         match message {
             Message::BatteryLimitChanged(value) => {
                 self.battery_limit = value;
+                write!(self.daemon, "charge\n{}\n", self.battery_limit)
+                    .expect("couldn't write to daemon");
             }
             Message::FanDutyChanged(value) => {
                 self.fan_duty = value;
                 self.fan_auto = false;
+                write!(self.daemon, "fan\n{}\n", self.fan_duty).expect("couldn't write to daemon");
             }
             Message::FanAutoToggled(value) => {
                 self.fan_auto = value;
-            }
-            Message::Apply => {
-                let batt_arg = String::from(format!(
-                    "ectool fwchargelimit {}",
-                    self.battery_limit.to_string()
-                ));
-
-                let fan_arg = String::from(if self.fan_auto {
-                    "ectool autofanctrl".to_string()
+                if value == false {
+                    write!(self.daemon, "fan\n{}\n", self.fan_duty)
+                        .expect("couldn't write to daemon");
                 } else {
-                    format!("ectool fanduty {}", self.fan_duty.to_string())
-                });
-
-                let sh_arg = format!("{}; {};", batt_arg, fan_arg);
-
-                let _ = Command::new("pkexec")
-                    .args(["sh", "-c"])
-                    .arg(sh_arg)
-                    .output()
-                    .expect("failed to execute process");
+                    write!(self.daemon, "autofan\n").expect("couldn't write to daemon");
+                }
             }
+            Message::BacklightChanged(value) => {
+                self.backlight = value;
+                self.backlight_auto = false;
+                write!(self.daemon, "backlight\n{}\n", value).expect("couldn't write to daemon");
+            }
+            Message::BacklightAutoToggled(value) => {
+                self.backlight_auto = value;
+            } // Message::Apply => {
+              //     let mut stdin = self.daemon_handle.stdin.take().expect("couldn't take stdin of daemon");
+              //     stdin.write_all();
+              // }
         }
     }
 
@@ -126,6 +139,28 @@ impl Sandbox for Toolbox {
 
         let fan_controls = column![fan_duty_row, fan_auto_toggler].align_items(Alignment::End);
 
+        // Backlight stuff
+        //
+        let backlight_slider = slider(1000..=96000, self.backlight, Message::BacklightChanged)
+            .width(Length::Units(200));
+
+        let backlight_row = row![text("1000"), backlight_slider, text("96000")]
+            .spacing(10)
+            .padding(20)
+            .align_items(Alignment::End);
+
+        let backlight_auto_toggler = toggler(
+            String::from("Auto"),
+            self.backlight_auto,
+            Message::BacklightAutoToggled,
+        )
+        .text_alignment(alignment::Horizontal::Right)
+        .width(Length::Shrink)
+        .spacing(5);
+
+        let backlight_controls =
+            column![backlight_row, backlight_auto_toggler].align_items(Alignment::End);
+
         // Everything stuff
         //
         let content = column![
@@ -142,7 +177,15 @@ impl Sandbox for Toolbox {
                 }
             })),
             fan_controls,
-            button("Apply").on_press(Message::Apply),
+            text(format!("Backlight: {}", {
+                if self.backlight_auto {
+                    "Auto".to_string()
+                } else {
+                    format!("{}", self.backlight)
+                }
+            })),
+            backlight_controls,
+            // button("Apply").on_press(Message::Apply),
         ]
         .spacing(10)
         .padding(10)
