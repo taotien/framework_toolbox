@@ -14,7 +14,7 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 ## Dependencies
 
 - rust
-- ectool
+- ectool (DHowett/fw-ectool)
 - iio-sensor-proxy
 - Polkit/pkexec
 
@@ -25,3 +25,8 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 - check for iio-sensor-proxy
 - somehow capture F7/F8 presses to jank re-enable manual brightness while using
   ambient light sensor
+- change backlight slider to be offset for auto when it's implemented
+- power and side led control
+- keyboard remapping
+- find better way of communication with "daemon"
+- fan curves based on temperature
