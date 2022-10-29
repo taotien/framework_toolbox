@@ -41,7 +41,7 @@ impl Sandbox for Toolbox {
 
     fn new() -> Self {
         let config_exists = false;
-        println!("running in {}", std::env::current_dir().unwrap().display());
+        // println!("running in {}", std::env::current_dir().unwrap().display());
         let mut daemon = Command::new("pkexec")
             .arg("fwtbd")
             .stdin(Stdio::piped())

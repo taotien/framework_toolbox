@@ -20,6 +20,12 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 
 ## TODO/Need help
 
+- Windows support
+- package binaries
+- don't rely on hardcoded paths
+- run without shell, .desktop file?
+- config, esp. for ectool and other dependency paths
+- text input values for sliders
 - make purty
 - tray icon
 - check for iio-sensor-proxy
