@@ -15,7 +15,6 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 
 - rust
 - ectool (DHowett/fw-ectool)
-- iio-sensor-proxy
 - Polkit/pkexec
 
 ## TODO/Need help
@@ -28,6 +27,7 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 - text input values for sliders
 - make purty
 - tray icon
+- cli options to set stuff at boot
 - check for iio-sensor-proxy
 - somehow capture F7/F8 presses to jank re-enable manual brightness while using
   ambient light sensor
