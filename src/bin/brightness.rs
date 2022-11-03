@@ -1,92 +1,108 @@
-use std::{
-    collections::VecDeque,
-    fs::File,
-    io::{Read, Seek},
-    process::Command,
-};
+use self::Brightnessctl::*;
+use anyhow::Result;
+use std::fs::read_to_string;
+use std::thread::sleep;
+use std::time::Duration;
 
-// check if output scale was requested
-// adjust only if ambient goes over scale and manual adjustment
-// reset if auto is toggled
-//
-// try brightnessctl,fallback to writing to intel driver
+fn main() -> Result<()> {
+    let mut conf = Config {
+        averaging: 5,
+        sample_ms: 1000,
+        offset: 42069,
+        fps: 60,
+        transition_ms: 1000,
+        histeresis: 1000,
+    };
+    let max = brightnessctl(GetMax)?;
+    let scale = max / 3355;
+    let smooth = conf.transition_ms / conf.fps;
+    let mut avg = Vec::with_capacity(conf.averaging);
+    for _ in 0..conf.averaging {
+        let s = sensor()?;
+        avg.push(s);
+        sleep(Duration::from_millis(conf.sample_ms));
+    }
 
-fn main() {
-    // configs
-    //
-    let averaging = 5; // samples to retrieve before adjusting
-    let sample_ms = 500; // time between samples collected
-    let offset = 28800;
-    let fps = 60;
-    let transition_ms: u64 = 1000;
-
-    let mut sensor = File::open("/sys/bus/iio/devices/iio:device0/in_illuminance_raw")
-        .expect("couldn't open illuminance sensor");
-    let max = String::from_utf8(
-        Command::new("brightnessctl")
-            .arg("m")
-            .output()
-            .expect("couldn't call brightnessctl")
-            .stdout,
-    )
-    .unwrap();
-    let max = max.trim().parse::<i32>().unwrap();
-    let scale = max / 3355; // scale of brightness to sensor
-    let smooth = transition_ms / fps;
-    let mut last_target: i32 = 0;
-    let mut avg = VecDeque::with_capacity(averaging);
-    let mut idx = 0;
+    let mut current_prev = brightnessctl(Get)?;
     loop {
-        let mut ambient = String::new();
-        sensor.rewind().unwrap();
-        sensor.read_to_string(&mut ambient).unwrap();
-        let ambient = ambient.trim().parse::<i32>().unwrap();
-
-        let current = String::from_utf8(
-            Command::new("brightnessctl")
-                .arg("g")
-                .output()
-                .expect("couldn't call brightnessctl")
-                .stdout,
-        )
-        .unwrap();
-        let current = current.trim().parse::<i32>().unwrap();
-        // let extern_change = current - current_last;
-
-        if idx < averaging {
-            avg.pop_front();
-            avg.push_back(ambient);
-            idx += 1;
-        } else {
-            let ambient = Iterator::sum::<i32>(avg.iter()) / i32::try_from(avg.len()).unwrap();
-            let target = ambient * scale + offset;
-
-            let step = (target - current) / smooth as i32;
-
-            if target != last_target {
-                for _ in 0..smooth {
-                    let mut set = Command::new("brightnessctl");
-                    set.arg("s");
-
-                    if step.is_positive() {
-                        set.arg(format!("+{}", step.to_string()));
-                    } else {
-                        set.arg(format!("{}-", step.abs().to_string()));
-                    }
-
-                    set.output().unwrap();
-
-                    std::thread::sleep(std::time::Duration::from_millis(
-                        (transition_ms / smooth) as u64,
-                    ));
-                }
-                last_target = target;
+        for idx in 0..conf.averaging {
+            avg[idx] = sensor()?;
+            let ambient: i32 = avg.iter().sum::<i32>() / i32::try_from(avg.len()).unwrap();
+            let current = brightnessctl(Get)?;
+            let changed = current - current_prev;
+            if changed != 0 {
+                conf.offset += changed;
+                current_prev = current;
+                sleep(Duration::from_millis(conf.sample_ms));
             }
-            idx = 0;
+            sleep(Duration::from_millis(conf.sample_ms));
+            if idx >= conf.averaging - 1 {
+                let target = ambient * scale + conf.offset;
+                let adjust = target - current;
+                if adjust.abs() > conf.histeresis {
+                    let step = adjust / smooth as i32;
+                    for _ in 0..smooth {
+                        brightnessctl(Adjust(step))?;
+                        sleep(Duration::from_millis(conf.transition_ms / smooth));
+                    }
+                    current_prev = brightnessctl(Get)?;
+                }
+            }
         }
+    }
+}
 
-        // TODO change to non-blocking to allow collect more sensor data points?
-        // will need to track sensor changes rather than spam reads
-        std::thread::sleep(std::time::Duration::from_millis(sample_ms));
+struct Config {
+    averaging: usize,
+    sample_ms: u64,
+    offset: i32,
+    fps: u64,
+    transition_ms: u64,
+    histeresis: i32,
+}
+
+fn sensor() -> Result<i32> {
+    let a = read_to_string("/sys/bus/iio/devices/iio:device0/in_illuminance_raw")?
+        .trim()
+        .parse()?;
+    Ok(a)
+}
+
+pub enum Brightnessctl {
+    Get,
+    Set(i32),
+    Adjust(i32),
+    GetMax,
+}
+
+pub fn brightnessctl(op: Brightnessctl) -> Result<i32> {
+    use std::process::Command;
+    let mut b = Command::new("brightnessctl");
+    match op {
+        Brightnessctl::Get => {
+            b.arg("get");
+        }
+        Brightnessctl::Set(v) => {
+            b.arg("set");
+            b.arg(v.to_string());
+        }
+        Brightnessctl::Adjust(v) if v.is_negative() => {
+            b.arg("set");
+            b.arg(format!("{}-", v.abs().to_string()));
+        }
+        Brightnessctl::Adjust(v) => {
+            b.arg("set");
+            b.arg(format!("+{}", v.to_string()));
+        }
+        Brightnessctl::GetMax => {
+            b.arg("max");
+        }
+    }
+
+    let b = b.output()?;
+    let b = String::from_utf8(b.stdout)?.trim().parse();
+    match b {
+        Ok(b) => Ok(b),
+        Err(_) => Ok(0),
     }
 }
