@@ -27,6 +27,7 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 - text input values for sliders
 - make purty
 - tray icon
+- use dbus for brightness stuff?
 - cli options to set stuff at boot
 - check for iio-sensor-proxy
 - somehow capture F7/F8 presses to jank re-enable manual brightness while using

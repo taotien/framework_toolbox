@@ -14,6 +14,7 @@ name = "fwtbd"
 path = "src/bin/daemon.rs"
 
 [dependencies]
+anyhow = "1.0.66"
 iced = { git = "https://github.com/iced-rs/iced", rev = "77c8380", features = ["tokio"] }
 os_pipe = "1.1.1"
 serde = { version = "1.0.145", features = ["derive"] }
