@@ -16,9 +16,11 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 - rust
 - ectool (DHowett/fw-ectool)
 - Polkit/pkexec
+- brightnessctl
 
 ## TODO/Need help
 
+- check existence of dependencies and notify + reduce features
 - Windows support
 - package binaries
 - don't rely on hardcoded paths
@@ -29,7 +31,6 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 - tray icon
 - use dbus for brightness stuff?
 - cli options to set stuff at boot
-- check for iio-sensor-proxy
 - somehow capture F7/F8 presses to jank re-enable manual brightness while using
   ambient light sensor
 - change backlight slider to be offset for auto when it's implemented

@@ -7,7 +7,7 @@ use std::time::Duration;
 fn main() -> Result<()> {
     let mut conf = Config {
         averaging: 5,
-        sample_ms: 1000,
+        sample_ms: 100,
         offset: 42069,
         fps: 60,
         transition_ms: 1000,

@@ -2,7 +2,9 @@ use std::io;
 use std::io::{Error, Write};
 use std::process::{Command, Output};
 
-fn main() {
+use anyhow::Result;
+
+fn main() -> Result<()> {
     let stdin = io::stdin();
     loop {
         let mut buffer = String::new();
@@ -33,6 +35,7 @@ fn main() {
             _ => break,
         };
     }
+    Ok(())
 }
 
 fn charge(lim: String) -> Result<Output, Error> {
@@ -42,23 +45,15 @@ fn charge(lim: String) -> Result<Output, Error> {
         .output()
 }
 
-#[rustfmt::skip]
 fn fan(duty: String) -> Result<Output, Error> {
-    Command::new("ectool")
-        .arg("fanduty")
-        .arg(duty)
-        .output()
+    Command::new("ectool").arg("fanduty").arg(duty).output()
 }
 
-#[rustfmt::skip]
 fn autofan() -> Result<Output, Error> {
-    Command::new("ectool")
-        .arg("autofanctrl")
-        .output()
+    Command::new("ectool").arg("autofanctrl").output()
 }
 
 fn backlight(val: String) -> Result<(), Error> {
-    let mut f = std::fs::File::create("/sys/class/backlight/intel_backlight/brightness")
-        .expect("couldn't open backlight device file");
+    let mut f = std::fs::File::create("/sys/class/backlight/intel_backlight/brightness")?;
     f.write_all(val.as_bytes())
 }
