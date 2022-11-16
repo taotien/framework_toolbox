@@ -4,7 +4,9 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use iced::widget::{
     column, container, horizontal_rule, horizontal_space, row, slider, text, toggler,
 };
-use iced::{Subscription, alignment, executor, Alignment, Application, Color, Length, Settings, Theme};
+use iced::{
+    alignment, executor, Alignment, Application, Color, Length, Settings, Subscription, Theme,
+};
 
 use iced_native::{window, Event};
 

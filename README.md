@@ -20,7 +20,8 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 
 ## TODO/Need help
 
-- check existence of dependencies and notify + reduce features
+- auto-brightness tuning
+- periodically set config since bios seems to reset it on resume from hiber
 - Windows support
 - package binaries
 - don't rely on hardcoded paths
