@@ -1,6 +1,7 @@
 use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::time::Duration;
 
 use iced::widget::{
     button, column, container, horizontal_rule, horizontal_space, row, slider, text, toggler,
@@ -48,6 +49,7 @@ pub enum Message {
     FanAutoToggled(bool),
     BacklightChanged(u32),
     BacklightAutoToggled(bool),
+    Update,
     // Apply,
     Save,
 }
@@ -141,6 +143,14 @@ impl Application for Toolbox {
                     c.kill().expect("couldn't kill autobacklight");
                 }
             }
+            Message::Update => {
+                writeln!(
+                    self.daemon.as_ref().unwrap(),
+                    "charge\n{}",
+                    self.battery_limit
+                )
+                .expect("couldn't write to daemon");
+            }
             Message::Save => {
                 let toml = toml_edit::easy::to_string(&self).unwrap();
                 let mut f = File::create("fwtb.toml").unwrap();
@@ -160,7 +170,11 @@ impl Application for Toolbox {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        iced_native::subscription::events().map(Message::Event)
+        let subs = vec![
+            iced_native::subscription::events().map(Message::Event),
+            iced::time::every(Duration::from_secs(5)).map(|_| Message::Update), // dunno why a closure is needed here
+        ];
+        iced_native::Subscription::batch(subs)
     }
 
     fn should_exit(&self) -> bool {
