@@ -1,14 +1,17 @@
+use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::process::{Child, ChildStdin, Command, Stdio};
 
 use iced::widget::{
-    column, container, horizontal_rule, horizontal_space, row, slider, text, toggler,
+    button, column, container, horizontal_rule, horizontal_space, row, slider, text, toggler,
 };
 use iced::{
     alignment, executor, Alignment, Application, Color, Length, Settings, Subscription, Theme,
 };
 
 use iced_native::{window, Event};
+
+use serde::{Deserialize, Serialize};
 
 pub fn main() -> iced::Result {
     Toolbox::run(Settings {
@@ -22,14 +25,18 @@ pub fn main() -> iced::Result {
     })
 }
 
+#[derive(Deserialize, Serialize)]
 struct Toolbox {
     battery_limit: u8,
     fan_duty: u8,
     fan_auto: bool,
     backlight: u32,
     backlight_auto: bool,
+    #[serde(skip)]
     backlight_daemon: Option<Child>,
-    daemon: ChildStdin,
+    #[serde(skip)]
+    daemon: Option<ChildStdin>,
+    #[serde(skip)]
     should_exit: bool,
 }
 
@@ -42,6 +49,7 @@ pub enum Message {
     BacklightChanged(u32),
     BacklightAutoToggled(bool),
     // Apply,
+    Save,
 }
 
 impl Application for Toolbox {
@@ -51,36 +59,38 @@ impl Application for Toolbox {
     type Flags = ();
 
     fn new(_flags: ()) -> (Toolbox, iced::Command<Message>) {
-        let config_exists = false;
-        // println!("running in {}", std::env::current_dir().unwrap().display());
+        // elevate daemon at start rather than wait for user interaction
         let mut daemon = Command::new("pkexec")
             .arg("fwtbd")
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .spawn()
             .expect("failed to open daemon");
+        // hold onto the stdin to communicate and keep process alive
         let daemon_stdin = daemon.stdin.take().expect("couldn't take stdin of daemon");
 
-        // writeln!(&daemon_stdin, "charge\n{}", 69).expect("couldn't write to daemon");
-        // writeln!(&daemon_stdin, "autofan\n").expect("couldn't write to daemon");
-
-        if config_exists {
-            todo!()
-        } else {
-            (
-                Toolbox {
+        // check for existing config, otherwise default
+        let mut tb: Toolbox;
+        match read_to_string("fwtb.toml") {
+            Ok(s) => {
+                tb = toml_edit::easy::from_str(&s).unwrap();
+                tb.daemon = Some(daemon_stdin);
+            }
+            Err(_) => {
+                tb = Toolbox {
                     battery_limit: 69,
                     fan_duty: 42,
                     fan_auto: true,
                     backlight: 48000,
                     backlight_auto: true,
                     backlight_daemon: None,
-                    daemon: daemon_stdin,
+                    daemon: Some(daemon_stdin),
                     should_exit: false,
-                },
-                iced::Command::none(),
-            )
+                };
+            }
         }
+
+        (tb, iced::Command::none())
     }
 
     fn title(&self) -> String {
@@ -91,26 +101,33 @@ impl Application for Toolbox {
         match message {
             Message::BatteryLimitChanged(value) => {
                 self.battery_limit = value;
-                writeln!(&self.daemon, "charge\n{}", self.battery_limit)
-                    .expect("couldn't write to daemon");
+                writeln!(
+                    self.daemon.as_ref().unwrap(),
+                    "charge\n{}",
+                    self.battery_limit
+                )
+                .expect("couldn't write to daemon");
             }
             Message::FanDutyChanged(value) => {
                 self.fan_duty = value;
                 self.fan_auto = false;
-                writeln!(&self.daemon, "fan\n{}", self.fan_duty).expect("couldn't write to daemon");
+                writeln!(self.daemon.as_ref().unwrap(), "fan\n{}", self.fan_duty)
+                    .expect("couldn't write to daemon");
             }
             Message::FanAutoToggled(value) => {
                 self.fan_auto = value;
                 if !value {
-                    writeln!(&self.daemon, "fan\n{}", self.fan_duty)
+                    writeln!(self.daemon.as_ref().unwrap(), "fan\n{}", self.fan_duty)
                         .expect("couldn't write to daemon");
                 } else {
-                    writeln!(&self.daemon, "autofan").expect("couldn't write to daemon");
+                    writeln!(self.daemon.as_ref().unwrap(), "autofan")
+                        .expect("couldn't write to daemon");
                 }
             }
             Message::BacklightChanged(value) => {
                 self.backlight = value;
-                writeln!(&self.daemon, "backlight\n{}", value).expect("couldn't write to daemon");
+                writeln!(self.daemon.as_ref().unwrap(), "backlight\n{}", value)
+                    .expect("couldn't write to daemon");
             }
             Message::BacklightAutoToggled(value) => {
                 self.backlight_auto = value;
@@ -120,13 +137,17 @@ impl Application for Toolbox {
                             .spawn()
                             .expect("couldn't start autobacklight"),
                     )
-                } else {
-                    if let Some(c) = &mut self.backlight_daemon {
-                        c.kill().expect("couldn't kill autobacklight");
-                    }
+                } else if let Some(c) = &mut self.backlight_daemon {
+                    c.kill().expect("couldn't kill autobacklight");
                 }
             }
+            Message::Save => {
+                let toml = toml_edit::easy::to_string(&self).unwrap();
+                let mut f = File::create("fwtb.toml").unwrap();
+                f.write_all(toml.as_bytes()).unwrap();
+            }
             Message::Event(event) => {
+                // fwtbd kills itself when stdin is dropped
                 if let Event::Window(window::Event::CloseRequested) = event {
                     if let Some(c) = &mut self.backlight_daemon {
                         c.kill().expect("couldn't kill autobacklight");
@@ -229,10 +250,13 @@ impl Application for Toolbox {
             })),
             backlight_controls,
             // button("Apply").on_press(Message::Apply),
+            button("Save").on_press(Message::Save),
         ]
         .spacing(10)
         .padding(10)
         .align_items(Alignment::Center);
+
+        println!("ding!");
 
         container(content).center_x().into()
     }

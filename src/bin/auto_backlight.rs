@@ -88,11 +88,11 @@ pub fn brightnessctl(op: Brightnessctl) -> Result<i32> {
         }
         Brightnessctl::Adjust(v) if v.is_negative() => {
             b.arg("set");
-            b.arg(format!("{}-", v.abs().to_string()));
+            b.arg(format!("{}-", v.abs()));
         }
         Brightnessctl::Adjust(v) => {
             b.arg("set");
-            b.arg(format!("+{}", v.to_string()));
+            b.arg(format!("+{}", v));
         }
         Brightnessctl::GetMax => {
             b.arg("max");

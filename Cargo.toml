@@ -24,4 +24,4 @@ iced_native = { git = "https://github.com/iced-rs/iced", rev = "77c8380" }
 iced_lazy = { git = "https://github.com/iced-rs/iced", rev = "77c8380" }
 os_pipe = "1.1.1"
 serde = { version = "1.0.145", features = ["derive"] }
-toml = "0.5.9"
+toml_edit = { version = "0.15.0", features = ["easy"] }
