@@ -270,8 +270,6 @@ impl Application for Toolbox {
         .padding(10)
         .align_items(Alignment::Center);
 
-        println!("ding!");
-
         container(content).center_x().into()
     }
 }
