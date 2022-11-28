@@ -20,9 +20,8 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 
 ## TODO/Need help
 
-- validate configs
-- auto-brightness tuning
-- periodically set config since bios seems to reset it on resume from hiber
+- remove dependency on brightnessctl
+- validate configs, proper paths
 - Windows support
 - package binaries
 - don't rely on hardcoded paths

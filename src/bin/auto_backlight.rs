@@ -7,7 +7,9 @@ use std::fs::read_to_string;
 use std::thread::sleep;
 use std::time::Duration;
 
+// TODO this can probably be merged back into main rather than a separate binary
 fn main() -> Result<()> {
+    // TODO read this from file
     let conf = Config {
         averaging: 5,
         sample_ms: 100,
@@ -17,6 +19,7 @@ fn main() -> Result<()> {
     let max = brightnessctl(GetMax)?;
     let smooth = conf.transition_ms / conf.fps;
 
+    // should've thought of this earlier
     let start = Key::new(0., 100., Interpolation::Linear);
     let end = Key::new(3355., max.into(), Interpolation::default());
     let mut curve = Spline::from_vec(vec![start, end]);
@@ -36,6 +39,10 @@ fn main() -> Result<()> {
             let current = brightnessctl(Get)?;
             let changed = current - current_prev;
             if changed != 0 {
+                // made long so user settles on value
+                sleep(Duration::from_secs(5));
+                // TODO clear upper/lower vals so curve is always maintaining direction and not wobbly
+                let current = brightnessctl(Get)?;
                 let key = curve.keys().iter().position(|&k| k.t == ambient.into());
                 match key {
                     Some(k) => {
@@ -49,12 +56,10 @@ fn main() -> Result<()> {
                         ));
                     }
                 }
-                sleep(Duration::from_millis(conf.sample_ms));
             }
             sleep(Duration::from_millis(conf.sample_ms));
             if idx >= conf.averaging - 1 {
                 let target: i32 = curve.clamped_sample(ambient.into()).unwrap() as i32;
-                println!("{}, {}", ambient, target);
                 let adjust = target - current;
                 let step = adjust / smooth as i32;
                 for _ in 0..smooth {

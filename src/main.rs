@@ -31,7 +31,6 @@ struct Toolbox {
     battery_limit: u8,
     fan_duty: u8,
     fan_auto: bool,
-    backlight: u32,
     backlight_auto: bool,
     #[serde(skip)]
     backlight_daemon: Option<Child>,
@@ -47,7 +46,6 @@ pub enum Message {
     BatteryLimitChanged(u8),
     FanDutyChanged(u8),
     FanAutoToggled(bool),
-    BacklightChanged(u32),
     BacklightAutoToggled(bool),
     Update,
     // Apply,
@@ -83,7 +81,6 @@ impl Application for Toolbox {
                     battery_limit: 69,
                     fan_duty: 42,
                     fan_auto: true,
-                    backlight: 48000,
                     backlight_auto: true,
                     backlight_daemon: None,
                     daemon: Some(daemon_stdin),
@@ -125,11 +122,6 @@ impl Application for Toolbox {
                     writeln!(self.daemon.as_ref().unwrap(), "autofan")
                         .expect("couldn't write to daemon");
                 }
-            }
-            Message::BacklightChanged(value) => {
-                self.backlight = value;
-                writeln!(self.daemon.as_ref().unwrap(), "backlight\n{}", value)
-                    .expect("couldn't write to daemon");
             }
             Message::BacklightAutoToggled(value) => {
                 self.backlight_auto = value;
@@ -219,14 +211,6 @@ impl Application for Toolbox {
 
         // Backlight stuff
         //
-        let backlight_slider = slider(1000..=96000, self.backlight, Message::BacklightChanged)
-            .width(Length::Units(200));
-
-        let backlight_row = row![text("1000"), backlight_slider, text("96000")]
-            .spacing(10)
-            .padding(20)
-            .align_items(Alignment::End);
-
         let backlight_auto_toggler = toggler(
             String::from("Auto"),
             self.backlight_auto,
@@ -236,8 +220,7 @@ impl Application for Toolbox {
         .width(Length::Shrink)
         .spacing(5);
 
-        let backlight_controls =
-            column![backlight_row, backlight_auto_toggler].align_items(Alignment::End);
+        let backlight_controls = column![backlight_auto_toggler].align_items(Alignment::End);
 
         // Everything stuff
         //
@@ -259,7 +242,7 @@ impl Application for Toolbox {
                 if self.backlight_auto {
                     "Auto".to_string()
                 } else {
-                    format!("{}", self.backlight)
+                    "Off".to_string()
                 }
             })),
             backlight_controls,

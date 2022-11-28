@@ -1,5 +1,5 @@
 use std::io;
-use std::io::{Error, Write};
+use std::io::Error;
 use std::process::{Command, Output};
 
 use anyhow::Result;
@@ -26,12 +26,6 @@ fn main() -> Result<()> {
             "autofan" => {
                 autofan().expect("fail");
             }
-            "backlight" => {
-                let mut buffer = String::new();
-                stdin.read_line(&mut buffer).expect("couldn't read stdin");
-                print!("{}", &buffer);
-                backlight(buffer.trim().to_string()).expect("fail");
-            }
             _ => break,
         };
     }
@@ -51,9 +45,4 @@ fn fan(duty: String) -> Result<Output, Error> {
 
 fn autofan() -> Result<Output, Error> {
     Command::new("ectool").arg("autofanctrl").output()
-}
-
-fn backlight(val: String) -> Result<(), Error> {
-    let mut f = std::fs::File::create("/sys/class/backlight/intel_backlight/brightness")?;
-    f.write_all(val.as_bytes())
 }
