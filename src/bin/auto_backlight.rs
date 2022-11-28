@@ -1,21 +1,26 @@
-use self::Brightnessctl::*;
 use anyhow::Result;
+use splines::{Interpolation, Key, Spline};
+
+use self::Brightnessctl::*;
+
 use std::fs::read_to_string;
 use std::thread::sleep;
 use std::time::Duration;
 
 fn main() -> Result<()> {
-    let mut conf = Config {
+    let conf = Config {
         averaging: 5,
         sample_ms: 100,
-        offset: 42069,
         fps: 60,
         transition_ms: 1000,
-        histeresis: 1000,
     };
     let max = brightnessctl(GetMax)?;
-    let scale = max / 3355;
     let smooth = conf.transition_ms / conf.fps;
+
+    let start = Key::new(0., 100., Interpolation::Linear);
+    let end = Key::new(3355., max.into(), Interpolation::default());
+    let mut curve = Spline::from_vec(vec![start, end]);
+
     let mut avg = Vec::with_capacity(conf.averaging);
     for _ in 0..conf.averaging {
         let s = sensor()?;
@@ -31,22 +36,32 @@ fn main() -> Result<()> {
             let current = brightnessctl(Get)?;
             let changed = current - current_prev;
             if changed != 0 {
-                conf.offset += changed;
-                current_prev = current;
+                let key = curve.keys().iter().position(|&k| k.t == ambient.into());
+                match key {
+                    Some(k) => {
+                        *curve.get_mut(k).unwrap().value = current as f64;
+                    }
+                    None => {
+                        curve.add(Key::new(
+                            ambient.into(),
+                            current.into(),
+                            Interpolation::default(),
+                        ));
+                    }
+                }
                 sleep(Duration::from_millis(conf.sample_ms));
             }
             sleep(Duration::from_millis(conf.sample_ms));
             if idx >= conf.averaging - 1 {
-                let target = ambient * scale + conf.offset;
+                let target: i32 = curve.clamped_sample(ambient.into()).unwrap() as i32;
+                println!("{}, {}", ambient, target);
                 let adjust = target - current;
-                if adjust.abs() > conf.histeresis {
-                    let step = adjust / smooth as i32;
-                    for _ in 0..smooth {
-                        brightnessctl(Adjust(step))?;
-                        sleep(Duration::from_millis(conf.transition_ms / smooth));
-                    }
-                    current_prev = brightnessctl(Get)?;
+                let step = adjust / smooth as i32;
+                for _ in 0..smooth {
+                    brightnessctl(Adjust(step))?;
+                    sleep(Duration::from_millis(conf.transition_ms / smooth));
                 }
+                current_prev = brightnessctl(Get)?;
             }
         }
     }
@@ -55,10 +70,8 @@ fn main() -> Result<()> {
 struct Config {
     averaging: usize,
     sample_ms: u64,
-    offset: i32,
     fps: u64,
     transition_ms: u64,
-    histeresis: i32,
 }
 
 fn sensor() -> Result<i32> {
