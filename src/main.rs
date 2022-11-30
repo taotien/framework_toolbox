@@ -89,6 +89,14 @@ impl Application for Toolbox {
             }
         }
 
+        if tb.backlight_auto {
+            tb.backlight_daemon = Some(
+                Command::new("fwtb-ab")
+                    .spawn()
+                    .expect("couldn't start autobacklight"),
+            )
+        }
+
         (tb, iced::Command::none())
     }
 
@@ -150,6 +158,7 @@ impl Application for Toolbox {
             }
             Message::Event(event) => {
                 // fwtbd kills itself when stdin is dropped
+                // TODO change so we don't rely on that hack
                 if let Event::Window(window::Event::CloseRequested) = event {
                     if let Some(c) = &mut self.backlight_daemon {
                         c.kill().expect("couldn't kill autobacklight");
