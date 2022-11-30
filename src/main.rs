@@ -7,7 +7,8 @@ use iced::widget::{
     button, column, container, horizontal_rule, horizontal_space, row, slider, text, toggler,
 };
 use iced::{
-    alignment, executor, Alignment, Application, Color, Length, Settings, Subscription, Theme,
+    alignment, executor, Alignment, Application, Color, Element, Length, Settings, Subscription,
+    Theme,
 };
 
 use iced_native::{window, Event};
@@ -18,7 +19,7 @@ pub fn main() -> iced::Result {
     Toolbox::run(Settings {
         exit_on_close_request: false,
         window: iced::window::Settings {
-            size: (400, 800),
+            size: (400, 350),
             resizable: false,
             ..iced::window::Settings::default()
         },
@@ -58,6 +59,18 @@ impl Application for Toolbox {
     type Executor = executor::Default;
     type Theme = Theme;
     type Flags = ();
+
+    fn title(&self) -> String {
+        String::from("Framework Toolbox")
+    }
+
+    fn theme(&self) -> Theme {
+        Theme::Dark
+    }
+
+    fn should_exit(&self) -> bool {
+        self.should_exit
+    }
 
     fn new(_flags: ()) -> (Toolbox, iced::Command<Message>) {
         // elevate daemon at start rather than wait for user interaction
@@ -101,6 +114,14 @@ impl Application for Toolbox {
         }
 
         (tb, iced::Command::none())
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        let subs = vec![
+            iced_native::subscription::events().map(Message::Event),
+            iced::time::every(Duration::from_secs(5)).map(|_| Message::Update), // dunno why a closure is needed here
+        ];
+        iced_native::Subscription::batch(subs)
     }
 
     fn update(&mut self, message: Self::Message) -> iced::Command<Message> {
@@ -183,31 +204,38 @@ impl Application for Toolbox {
         // Battery stuff
         //
         let battery_limit_slider =
-            slider(40..=100, self.battery_limit, Message::BatteryLimitChanged)
-                .width(Length::Units(200));
+            slider(40..=100, self.battery_limit, Message::BatteryLimitChanged);
 
-        let battery_controls = row![text("40%"), battery_limit_slider, text("100%")]
-            .spacing(10)
-            .padding(20)
-            .align_items(Alignment::End);
+        let battery_controls = row![
+            text("40%")
+                .width(Length::Fill)
+                .horizontal_alignment(alignment::Horizontal::Right),
+            battery_limit_slider.width(Length::FillPortion(5)),
+            text("100%")
+                .width(Length::Fill)
+                .horizontal_alignment(alignment::Horizontal::Left),
+        ]
+        .spacing(10);
 
         // Fan stuff
         //
-        let fan_duty_slider =
-            slider(0..=100, self.fan_duty, Message::FanDutyChanged).width(Length::Units(200));
+        let fan_duty_slider = slider(0..=100, self.fan_duty, Message::FanDutyChanged);
 
-        let fan_duty_row = row![text("0%"), fan_duty_slider, text("100%")]
-            .spacing(10)
-            .padding(20)
-            .align_items(Alignment::End);
+        let fan_duty_row = row![
+            text("0%")
+                .width(Length::Fill)
+                .horizontal_alignment(alignment::Horizontal::Right),
+            fan_duty_slider.width(Length::FillPortion(5)),
+            text("100%")
+                .width(Length::Fill)
+                .horizontal_alignment(alignment::Horizontal::Left)
+        ]
+        .spacing(10);
 
         let fan_auto_toggler =
             toggler(String::from("Auto"), self.fan_auto, Message::FanAutoToggled)
                 .text_alignment(alignment::Horizontal::Right)
-                .width(Length::Shrink)
-                .spacing(5);
-
-        let fan_controls = column![fan_duty_row, fan_auto_toggler].align_items(Alignment::End);
+                .spacing(10);
 
         // Backlight stuff
         //
@@ -217,18 +245,14 @@ impl Application for Toolbox {
             Message::BacklightAutoToggled,
         )
         .text_alignment(alignment::Horizontal::Right)
-        .width(Length::Shrink)
-        .spacing(5);
-
-        let backlight_controls = column![backlight_auto_toggler].align_items(Alignment::End);
+        .spacing(10);
 
         // Everything stuff
         //
-        let content = column![
+        let content: Element<_> = column![
             title,
             horizontal_rule(5),
             horizontal_space(Length::Fill),
-            // battery
             text(format!("Battery Limit: {}%", self.battery_limit)),
             battery_controls,
             text(format!("Fan Duty: {}", {
@@ -238,45 +262,24 @@ impl Application for Toolbox {
                     format!("{}%", self.fan_duty)
                 }
             })),
-            // fan
-            fan_controls,
+            fan_duty_row,
+            fan_auto_toggler,
             text(format!("Backlight: {}", {
                 if self.backlight_auto {
                     "Auto".to_string()
                 } else {
-                    "Off".to_string()
+                    "Manual".to_string()
                 }
             })),
-            // backlight
-            backlight_controls,
-            // config
+            backlight_auto_toggler,
             button("Save").on_press(Message::Save),
         ]
         .spacing(10)
         .padding(10)
-        .height(Length::Shrink)
-        .align_items(Alignment::Center);
+        .align_items(Alignment::Center)
+        .into();
 
+        // container(content.explain(Color::BLACK)).center_x().into()
         container(content).center_x().into()
-    }
-
-    fn subscription(&self) -> Subscription<Message> {
-        let subs = vec![
-            iced_native::subscription::events().map(Message::Event),
-            iced::time::every(Duration::from_secs(5)).map(|_| Message::Update), // dunno why a closure is needed here
-        ];
-        iced_native::Subscription::batch(subs)
-    }
-
-    fn title(&self) -> String {
-        String::from("Framework Toolbox")
-    }
-
-    fn theme(&self) -> Theme {
-        Theme::Dark
-    }
-
-    fn should_exit(&self) -> bool {
-        self.should_exit
     }
 }
