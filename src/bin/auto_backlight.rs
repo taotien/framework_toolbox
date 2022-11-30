@@ -7,7 +7,10 @@ use std::fs::read_to_string;
 use std::thread::sleep;
 use std::time::Duration;
 
-// TODO this can probably be merged back into main rather than a separate binary
+// TODO this can probably be merged back into main rather than a separate binary, or completely separted into a crate
+// TODO re-introduce histeris option?
+// TODO time-of-day/location-based brightnesses, as sensor isn't perfect?
+// TODO do this stuff asyncronously
 fn main() -> Result<()> {
     // TODO read this from file
     let conf = Config {
@@ -59,6 +62,7 @@ fn main() -> Result<()> {
             }
             sleep(Duration::from_millis(conf.sample_ms));
             if idx >= conf.averaging - 1 {
+                // TODO don't adjust if not much has changed to save battery
                 let target: i32 = curve.clamped_sample(ambient.into()).unwrap() as i32;
                 let adjust = target - current;
                 let step = adjust / smooth as i32;

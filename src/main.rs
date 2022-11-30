@@ -71,7 +71,9 @@ impl Application for Toolbox {
 
         // check for existing config, otherwise default
         let mut tb: Toolbox;
-        match read_to_string("fwtb.toml") {
+        let mut conf = dirs::config_dir().unwrap();
+        conf.push("fwtb.toml");
+        match read_to_string(conf) {
             Ok(s) => {
                 tb = toml_edit::easy::from_str(&s).unwrap();
                 tb.daemon = Some(daemon_stdin);
@@ -153,12 +155,16 @@ impl Application for Toolbox {
             }
             Message::Save => {
                 let toml = toml_edit::easy::to_string(&self).unwrap();
-                let mut f = File::create("fwtb.toml").unwrap();
+                let mut conf = dirs::config_dir().unwrap();
+                conf.push("fwtb.toml");
+                let mut f = File::create(conf).unwrap();
                 f.write_all(toml.as_bytes()).unwrap();
             }
             Message::Event(event) => {
+                // TODO
                 // fwtbd kills itself when stdin is dropped
-                // TODO change so we don't rely on that hack
+                // perhaps autobacklight should do the same so there's no resource leaks
+                // or find other non-hacky workaround
                 if let Event::Window(window::Event::CloseRequested) = event {
                     if let Some(c) = &mut self.backlight_daemon {
                         c.kill().expect("couldn't kill autobacklight");

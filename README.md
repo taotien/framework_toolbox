@@ -28,7 +28,7 @@ desktop-file-install fwtb.desktop
 ## TODO/Need help
 
 - remove dependency on brightnessctl
-- validate configs, proper paths
+- validate configs
 - Windows support
 - package binaries
 - don't rely on hardcoded paths
