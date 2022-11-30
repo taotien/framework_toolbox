@@ -27,6 +27,7 @@ desktop-file-install fwtb.desktop
 
 ## TODO/Need help
 
+- cleanup unecessary unwraps and expects
 - remove dependency on brightnessctl
 - validate configs
 - Windows support

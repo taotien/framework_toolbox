@@ -102,10 +102,6 @@ impl Application for Toolbox {
         (tb, iced::Command::none())
     }
 
-    fn title(&self) -> String {
-        String::from("Framework Toolbox")
-    }
-
     fn update(&mut self, message: Self::Message) -> iced::Command<Message> {
         match message {
             Message::BatteryLimitChanged(value) => {
@@ -174,18 +170,6 @@ impl Application for Toolbox {
             }
         };
         iced::Command::none()
-    }
-
-    fn subscription(&self) -> Subscription<Message> {
-        let subs = vec![
-            iced_native::subscription::events().map(Message::Event),
-            iced::time::every(Duration::from_secs(5)).map(|_| Message::Update), // dunno why a closure is needed here
-        ];
-        iced_native::Subscription::batch(subs)
-    }
-
-    fn should_exit(&self) -> bool {
-        self.should_exit
     }
 
     fn view(&self) -> iced::Element<Self::Message> {
@@ -269,5 +253,25 @@ impl Application for Toolbox {
         .align_items(Alignment::Center);
 
         container(content).center_x().into()
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        let subs = vec![
+            iced_native::subscription::events().map(Message::Event),
+            iced::time::every(Duration::from_secs(5)).map(|_| Message::Update), // dunno why a closure is needed here
+        ];
+        iced_native::Subscription::batch(subs)
+    }
+
+    fn title(&self) -> String {
+        String::from("Framework Toolbox")
+    }
+
+    fn theme(&self) -> Theme {
+        Theme::Dark
+    }
+
+    fn should_exit(&self) -> bool {
+        self.should_exit
     }
 }
