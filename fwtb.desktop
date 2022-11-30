@@ -1,0 +1,7 @@
+[Desktop Entry]
+X-Desktop-File-Install-Version=0.26
+Type=Application
+Name=Framework Toolbox
+Comment=Framework laptop utilites: charge limit, fans, etc.
+Exec=fwtb
+Categories=System

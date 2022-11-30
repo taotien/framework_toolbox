@@ -11,6 +11,13 @@ before installation**
 cargo install --git "https://github.com/taotien/framework_toolbox.git"
 ```
 
+Add cargo's bin folder to your desktop environment's PATH.
+
+```sh
+# do as root
+desktop-file-install fwtb.desktop
+```
+
 ## Dependencies
 
 - rust
@@ -25,16 +32,14 @@ cargo install --git "https://github.com/taotien/framework_toolbox.git"
 - Windows support
 - package binaries
 - don't rely on hardcoded paths
-- run without shell, .desktop file?
 - config, esp. for ectool and other dependency paths
 - text input values for sliders
 - make purty
-- tray icon
+- tray icon => waiting for iced
 - use dbus for brightness stuff?
 - cli options to set stuff at boot
 - somehow capture F7/F8 presses to jank re-enable manual brightness while using
   ambient light sensor
-- change backlight slider to be offset for auto when it's implemented
 - power and side led control
 - keyboard remapping
 - find better way of communication with "daemon"
