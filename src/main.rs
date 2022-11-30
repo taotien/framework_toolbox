@@ -32,6 +32,7 @@ struct Toolbox {
     fan_duty: u8,
     fan_auto: bool,
     backlight_auto: bool,
+
     #[serde(skip)]
     backlight_daemon: Option<Child>,
     #[serde(skip)]
@@ -185,7 +186,7 @@ impl Application for Toolbox {
             slider(40..=100, self.battery_limit, Message::BatteryLimitChanged)
                 .width(Length::Units(200));
 
-        let battery_limit_row = row![text("40%"), battery_limit_slider, text("100%")]
+        let battery_controls = row![text("40%"), battery_limit_slider, text("100%")]
             .spacing(10)
             .padding(20)
             .align_items(Alignment::End);
@@ -227,8 +228,9 @@ impl Application for Toolbox {
             title,
             horizontal_rule(5),
             horizontal_space(Length::Fill),
+            // battery
             text(format!("Battery Limit: {}%", self.battery_limit)),
-            battery_limit_row,
+            battery_controls,
             text(format!("Fan Duty: {}", {
                 if self.fan_auto {
                     "Auto".to_string()
@@ -236,6 +238,7 @@ impl Application for Toolbox {
                     format!("{}%", self.fan_duty)
                 }
             })),
+            // fan
             fan_controls,
             text(format!("Backlight: {}", {
                 if self.backlight_auto {
@@ -244,12 +247,14 @@ impl Application for Toolbox {
                     "Off".to_string()
                 }
             })),
+            // backlight
             backlight_controls,
-            // button("Apply").on_press(Message::Apply),
+            // config
             button("Save").on_press(Message::Save),
         ]
         .spacing(10)
         .padding(10)
+        .height(Length::Shrink)
         .align_items(Alignment::Center);
 
         container(content).center_x().into()
