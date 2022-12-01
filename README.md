@@ -20,6 +20,16 @@ Add cargo's bin folder to your desktop environment's PATH.
 desktop-file-install fwtb.desktop
 ```
 
+### If you want just the auto-brightness
+
+Clone the repo
+
+```sh
+cargo build --release fwtb-ab
+```
+
+Copy the binary from ./target/{arch}/release
+
 ## Dependencies
 
 - rust
@@ -29,22 +39,17 @@ desktop-file-install fwtb.desktop
 
 ## TODO/Need help
 
+- apply all settings on start, not just battery charge
 - check if ectool needs specific options on other distros/allow users to manually change arguments
 - cleanup unecessary unwraps and expects
 - remove dependency on brightnessctl
-- validate configs
 - Windows support
 - package binaries
-- don't rely on hardcoded paths
-- config, esp. for ectool and other dependency paths
 - text input values for sliders
-- make purty
 - tray icon => waiting for iced
 - use dbus for brightness stuff?
-- cli options to set stuff at boot
 - somehow capture F7/F8 presses to jank re-enable manual brightness while using
   ambient light sensor
-- power and side led control
 - keyboard remapping
 - find better way of communication with "daemon"
 - fan curves based on temperature

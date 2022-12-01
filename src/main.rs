@@ -20,7 +20,7 @@ pub fn main() -> iced::Result {
     Toolbox::run(Settings {
         exit_on_close_request: false,
         window: iced::window::Settings {
-            size: (400, 420),
+            size: (400, 450),
             resizable: false,
             ..iced::window::Settings::default()
         },
@@ -282,9 +282,18 @@ impl Application for Toolbox {
         );
 
         let led_row = row![
-            led_left_picker.width(Length::Fill),
-            led_power_picker.width(Length::Fill),
-            led_right_picker.width(Length::Fill),
+            column![text("Left"), led_left_picker,]
+                .width(Length::Fill)
+                .align_items(Alignment::Center)
+                .spacing(10),
+            column![text("Power"), led_power_picker,]
+                .width(Length::Fill)
+                .align_items(Alignment::Center)
+                .spacing(10),
+            column![text("Right"), led_right_picker,]
+                .align_items(Alignment::Center)
+                .width(Length::Fill)
+                .spacing(10),
         ]
         .spacing(10);
 
