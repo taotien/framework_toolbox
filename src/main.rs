@@ -177,14 +177,14 @@ impl Application for Toolbox {
             }
             Message::LEDLeftSelected(value) => {
                 self.led_left = Some(value);
-                daemon_write(self.daemon.as_ref(), "led left {}", value);
+                daemon_write(self.daemon.as_ref(), "led left", value);
             }
             Message::LEDRightSelected(value) => {
                 self.led_right = Some(value);
-                daemon_write(self.daemon.as_ref(), "led right {}", value);
+                daemon_write(self.daemon.as_ref(), "led right", value);
             }
             Message::Update => {
-                daemon_write(self.daemon.as_ref(), "fwchargelimit {}", self.battery_limit)
+                daemon_write(self.daemon.as_ref(), "fwchargelimit", self.battery_limit)
             }
             Message::Save => {
                 let toml = toml_edit::easy::to_string(&self).unwrap();
