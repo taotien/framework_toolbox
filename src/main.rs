@@ -4,7 +4,8 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::time::Duration;
 
 use iced::widget::{
-    button, column, container, horizontal_rule, horizontal_space, row, slider, text, toggler,
+    button, column, container, horizontal_rule, horizontal_space, pick_list, row, slider, text,
+    toggler,
 };
 use iced::{
     alignment, executor, Alignment, Application, Color, Element, Length, Settings, Subscription,
@@ -19,7 +20,7 @@ pub fn main() -> iced::Result {
     Toolbox::run(Settings {
         exit_on_close_request: false,
         window: iced::window::Settings {
-            size: (400, 350),
+            size: (400, 420),
             resizable: false,
             ..iced::window::Settings::default()
         },
@@ -33,6 +34,9 @@ struct Toolbox {
     fan_duty: u8,
     fan_auto: bool,
     backlight_auto: bool,
+    led_power: Option<LedColor>,
+    led_left: Option<LedColor>,
+    led_right: Option<LedColor>,
 
     #[serde(skip)]
     backlight_daemon: Option<Child>,
@@ -49,6 +53,9 @@ impl Default for Toolbox {
             fan_duty: 42,
             fan_auto: true,
             backlight_auto: true,
+            led_power: Some(LedColor::default()),
+            led_left: Some(LedColor::default()),
+            led_right: Some(LedColor::default()),
             backlight_daemon: None,
             daemon: None,
             should_exit: false,
@@ -63,6 +70,9 @@ pub enum Message {
     FanDutyChanged(u8),
     FanAutoToggled(bool),
     BacklightAutoToggled(bool),
+    LEDPowerSelected(LedColor),
+    LEDLeftSelected(LedColor),
+    LEDRightSelected(LedColor),
     Update,
     // Apply,
     Save,
@@ -134,27 +144,19 @@ impl Application for Toolbox {
         match message {
             Message::BatteryLimitChanged(value) => {
                 self.battery_limit = value;
-                writeln!(
-                    self.daemon.as_ref().unwrap(),
-                    "charge\n{}",
-                    self.battery_limit
-                )
-                .expect("couldn't write to daemon");
+                daemon_write(self.daemon.as_ref(), "fwchargelimit", value);
             }
             Message::FanDutyChanged(value) => {
                 self.fan_duty = value;
                 self.fan_auto = false;
-                writeln!(self.daemon.as_ref().unwrap(), "fan\n{}", self.fan_duty)
-                    .expect("couldn't write to daemon");
+                daemon_write(self.daemon.as_ref(), "fanduty", value);
             }
             Message::FanAutoToggled(value) => {
                 self.fan_auto = value;
                 if !value {
-                    writeln!(self.daemon.as_ref().unwrap(), "fan\n{}", self.fan_duty)
-                        .expect("couldn't write to daemon");
+                    daemon_write(self.daemon.as_ref(), "fanduty", value);
                 } else {
-                    writeln!(self.daemon.as_ref().unwrap(), "autofan")
-                        .expect("couldn't write to daemon");
+                    daemon_write::<&str>(self.daemon.as_ref(), "autofanctrl", "");
                 }
             }
             Message::BacklightAutoToggled(value) => {
@@ -169,13 +171,20 @@ impl Application for Toolbox {
                     c.kill().expect("couldn't kill autobacklight");
                 }
             }
+            Message::LEDPowerSelected(value) => {
+                self.led_power = Some(value);
+                daemon_write(self.daemon.as_ref(), "led power", value);
+            }
+            Message::LEDLeftSelected(value) => {
+                self.led_left = Some(value);
+                daemon_write(self.daemon.as_ref(), "led left {}", value);
+            }
+            Message::LEDRightSelected(value) => {
+                self.led_right = Some(value);
+                daemon_write(self.daemon.as_ref(), "led right {}", value);
+            }
             Message::Update => {
-                writeln!(
-                    self.daemon.as_ref().unwrap(),
-                    "charge\n{}",
-                    self.battery_limit
-                )
-                .expect("couldn't write to daemon");
+                daemon_write(self.daemon.as_ref(), "fwchargelimit {}", self.battery_limit)
             }
             Message::Save => {
                 let toml = toml_edit::easy::to_string(&self).unwrap();
@@ -202,7 +211,7 @@ impl Application for Toolbox {
         iced::Command::none()
     }
 
-    fn view(&self) -> iced::Element<Self::Message> {
+    fn view(&self) -> iced::Element<Message> {
         let title = text("Framework Toolbox")
             .width(Length::Fill)
             .size(42)
@@ -255,6 +264,30 @@ impl Application for Toolbox {
         .text_alignment(alignment::Horizontal::Right)
         .spacing(10);
 
+        // LED STuff
+        //
+        let led_left_picker =
+            pick_list(&LedColor::ALL[..], self.led_left, Message::LEDLeftSelected);
+
+        let led_power_picker = pick_list(
+            &LedColor::ALL[..],
+            self.led_power,
+            Message::LEDPowerSelected,
+        );
+
+        let led_right_picker = pick_list(
+            &LedColor::ALL[..],
+            self.led_right,
+            Message::LEDRightSelected,
+        );
+
+        let led_row = row![
+            led_left_picker.width(Length::Fill),
+            led_power_picker.width(Length::Fill),
+            led_right_picker.width(Length::Fill),
+        ]
+        .spacing(10);
+
         // Everything stuff
         //
         let content: Element<_> = column![
@@ -280,6 +313,8 @@ impl Application for Toolbox {
                 }
             })),
             backlight_auto_toggler,
+            text("LED Colors"),
+            led_row,
             button("Save").on_press(Message::Save),
         ]
         .spacing(10)
@@ -289,5 +324,61 @@ impl Application for Toolbox {
 
         // container(content.explain(Color::BLACK)).center_x().into()
         container(content).center_x().into()
+    }
+}
+fn daemon_write<T>(daemon: Option<&ChildStdin>, target: &str, value: T)
+where
+    T: std::fmt::Display,
+{
+    writeln!(daemon.unwrap(), "{} {}", target, value).expect("couldn't write to daemon!");
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub enum LedColor {
+    Auto,
+    White,
+    Red,
+    Green,
+    Blue,
+    Yellow,
+    Amber,
+    Off,
+}
+
+impl Default for LedColor {
+    fn default() -> Self {
+        LedColor::Auto
+    }
+}
+
+impl LedColor {
+    const ALL: [LedColor; 8] = [
+        LedColor::Auto,
+        LedColor::White,
+        LedColor::Red,
+        LedColor::Green,
+        LedColor::Blue,
+        LedColor::Yellow,
+        LedColor::Amber,
+        LedColor::Off,
+    ];
+}
+
+impl std::fmt::Display for LedColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                LedColor::Auto => "Auto",
+                LedColor::White => "White",
+                LedColor::Red => "Red",
+                LedColor::Green => "Green",
+                LedColor::Blue => "Blue",
+                LedColor::Yellow => "Yellow",
+                LedColor::Amber => "Amber",
+                LedColor::Off => "Off",
+            }
+        )
     }
 }
