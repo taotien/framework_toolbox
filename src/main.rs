@@ -42,6 +42,20 @@ struct Toolbox {
     should_exit: bool,
 }
 
+impl Default for Toolbox {
+    fn default() -> Self {
+        Toolbox {
+            battery_limit: 69,
+            fan_duty: 42,
+            fan_auto: true,
+            backlight_auto: true,
+            backlight_daemon: None,
+            daemon: None,
+            should_exit: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Message {
     Event(Event),
@@ -89,22 +103,14 @@ impl Application for Toolbox {
         conf.push("fwtb.toml");
         match read_to_string(conf) {
             Ok(s) => {
-                tb = toml_edit::easy::from_str(&s).unwrap();
-                tb.daemon = Some(daemon_stdin);
+                tb = toml_edit::easy::from_str(&s).unwrap_or_default();
             }
             Err(_) => {
-                tb = Toolbox {
-                    battery_limit: 69,
-                    fan_duty: 42,
-                    fan_auto: true,
-                    backlight_auto: true,
-                    backlight_daemon: None,
-                    daemon: Some(daemon_stdin),
-                    should_exit: false,
-                };
+                tb = Toolbox::default();
             }
         }
 
+        tb.daemon = Some(daemon_stdin);
         if tb.backlight_auto {
             tb.backlight_daemon = Some(
                 Command::new("fwtb-ab")
