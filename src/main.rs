@@ -176,6 +176,8 @@ impl Application for Toolbox {
                 let mut conf = dirs::config_dir().unwrap();
                 conf.push("fwtb.toml");
                 let mut f = File::create(conf).unwrap();
+                f.write_all("# Generated file, DO NOT EDIT!\n".as_bytes())
+                    .unwrap();
                 f.write_all(toml.as_bytes()).unwrap();
             }
             Message::Event(event) => {

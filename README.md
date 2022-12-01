@@ -27,6 +27,7 @@ desktop-file-install fwtb.desktop
 
 ## TODO/Need help
 
+- check if ectool needs specific options on other distros/allow users to manually change arguments
 - cleanup unecessary unwraps and expects
 - remove dependency on brightnessctl
 - validate configs
