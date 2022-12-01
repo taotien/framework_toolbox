@@ -30,6 +30,10 @@ cargo build --release fwtb-ab
 
 Copy the binary from ./target/{arch}/release
 
+## Removal
+
+`cargo uninstall fwtb` should do the trick. You'll have to find where your distro saves `.desktop` files to get rid of the shortcut.
+
 ## Dependencies
 
 - rust
