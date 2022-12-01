@@ -1,6 +1,6 @@
 [package]
 name = "framework_toolbox"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 
 default-run = "fwtb"
@@ -19,12 +19,12 @@ path = "src/bin/auto_backlight.rs"
 
 [dependencies]
 anyhow = "1.0.66"
-iced = { git = "https://github.com/iced-rs/iced", rev = "77c8380", features = ["tokio"] }
-iced_native = { git = "https://github.com/iced-rs/iced", rev = "77c8380" }
-iced_lazy = { git = "https://github.com/iced-rs/iced", rev = "77c8380" }
 os_pipe = "1.1.1"
 serde = { version = "1.0.145", features = ["derive"] }
 toml_edit = { version = "0.15.0", features = ["easy"] }
 splines = "4.1.1"
 dirs = "4.0.0"
+iced = {version = "0.5.2", features = ["tokio"]}
+iced_native = "0.6.1"
+iced_lazy = "0.2.0"
 # brightness = {version = "0.5.0", features = ["blocking"]}
