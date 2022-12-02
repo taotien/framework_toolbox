@@ -1,130 +1,178 @@
 use anyhow::Result;
 use splines::{Interpolation, Key, Spline};
 
-use self::Brightnessctl::*;
-
-use std::fs::read_to_string;
+use std::collections::VecDeque;
+use std::fs::{read_to_string, File};
+use std::io::Write;
 use std::thread::sleep;
 use std::time::Duration;
 
-// TODO this can probably be merged back into main rather than a separate binary, or completely separted into a crate
-// TODO re-introduce histeris option?
-// TODO time-of-day/location-based brightnesses, as sensor isn't perfect?
-// TODO do this stuff asyncronously
+const SAMPLING: u64 = 100;
+const HISTERESIS: i32 = 5000; // causes large jumps to hitch at the start, but may save cpu?
+
+// TODO perhaps cache calculated curve results
 fn main() -> Result<()> {
-    // TODO read this from file
-    let conf = Config {
-        averaging: 5,
-        sample_ms: 100,
-        fps: 60,
-        transition_ms: 1000,
-    };
-    let max = brightnessctl(GetMax)?;
-    let smooth = conf.transition_ms / conf.fps;
+    let mut b = Brightness::default();
+    let mut running = VecDeque::from([sensor()?; 10]);
+    let max = max()?;
+    // let floor = Key::new(0., 100., Interpolation::Linear);
+    // let ceil = Key::new(3350., max.into(), Interpolation::default());
+    let keys = (0..10).map(|i| i * 335); //.collect();
+    let mut vals: Vec<i32> = (0..10).map(|i| i * max / 10).collect();
+    vals[0] = 100;
 
-    // should've thought of this earlier
-    let start = Key::new(0., 100., Interpolation::Linear);
-    let end = Key::new(3355., max.into(), Interpolation::default());
-    let mut curve = Spline::from_vec(vec![start, end]);
-
-    let mut avg = Vec::with_capacity(conf.averaging);
-    for _ in 0..conf.averaging {
-        let s = sensor()?;
-        avg.push(s);
-        sleep(Duration::from_millis(conf.sample_ms));
+    let mut curve: Spline<f64, f64> = Spline::from_vec(vec![]);
+    for (i, k) in keys.clone().enumerate() {
+        let k = Key::new(k.into(), vals[i].into(), Interpolation::Linear);
+        curve.add(k);
     }
 
-    let mut current_prev = brightnessctl(Get)?;
+    let mut interval = Duration::from_millis(SAMPLING);
+
+    let mut step = 0;
+    let mut target: i32;
+    let mut stepper = (0..0).fuse();
+
     loop {
-        for idx in 0..conf.averaging {
-            avg[idx] = sensor()?;
-            let ambient: i32 = avg.iter().sum::<i32>() / i32::try_from(avg.len()).unwrap();
-            let current = brightnessctl(Get)?;
-            let changed = current - current_prev;
-            if changed != 0 {
-                // made long so user settles on value
-                sleep(Duration::from_secs(5));
-                // TODO clear upper/lower vals so curve is always maintaining direction and not wobbly
-                let current = brightnessctl(Get)?;
-                let key = curve.keys().iter().position(|&k| k.t == ambient.into());
-                match key {
-                    Some(k) => {
-                        *curve.get_mut(k).unwrap().value = current as f64;
-                    }
+        sleep(interval);
+        match b.changed() {
+            None => {
+                running.pop_front();
+                running.push_back(sensor()?);
+                let avg: i32 = running.iter().sum::<i32>() / running.len() as i32;
+                target = curve.clamped_sample(avg.into()).unwrap() as i32;
+                let diff = target - b.get();
+                println!("{target}, {diff}");
+                match stepper.next() {
                     None => {
-                        curve.add(Key::new(
-                            ambient.into(),
-                            current.into(),
-                            Interpolation::default(),
-                        ));
+                        if diff != 0 && diff.abs() > HISTERESIS {
+                            step = diff / 60;
+                            stepper = (0..60).fuse();
+                            interval = Duration::from_millis(16);
+                        }
+                    }
+                    Some(i) => {
+                        // TODO this can be cleaned up if using histeresis?
+                        if step == 0 {
+                            step = if diff > 0 { 1 } else { -1 };
+                        }
+                        let adj = b.get() + step;
+                        b.set(adj)?;
+                        if i == 59 || b.get() == target {
+                            stepper = (0..0).fuse();
+                            interval = Duration::from_millis(SAMPLING);
+                        }
                     }
                 }
             }
-            sleep(Duration::from_millis(conf.sample_ms));
-            if idx >= conf.averaging - 1 {
-                // TODO don't adjust if not much has changed to save battery
-                let target: i32 = curve.clamped_sample(ambient.into()).unwrap() as i32;
-                let adjust = target - current;
-                let step = adjust / smooth as i32;
-                for _ in 0..smooth {
-                    brightnessctl(Adjust(step))?;
-                    sleep(Duration::from_millis(conf.transition_ms / smooth));
+            Some(c) => {
+                // check if change was due to idle
+                // also
+                if c == 23456 {
+                    todo!()
+                } else {
+                    sleep(Duration::from_secs(3));
+                    let avg: i32 = running.iter().sum::<i32>() / running.len() as i32;
+                    if let Some(i) = keys.clone().position(|i| (avg - i).abs() <= 167) {
+                        let current = b.get();
+                        *curve.get_mut(i).unwrap().value = current.into();
+                        vals[i] = current;
+                    };
+                    b.as_set = b.get();
+                    println!("{keys:?}\n{vals:?}");
                 }
-                current_prev = brightnessctl(Get)?;
             }
         }
     }
 }
 
-struct Config {
-    averaging: usize,
-    sample_ms: u64,
-    fps: u64,
-    transition_ms: u64,
+fn spline_smoother(s: &mut Spline<f64, f64>, val: i32) {}
+
+struct Brightness {
+    as_set: i32,
+    current: i32,
+}
+
+// struct Targeter {
+//     target: i32,
+// }
+
+// impl Targeter {
+//     fn set(&self, val: i32) {
+//         self.target = val;
+//     }
+// }
+
+// impl Iterator for Targeter {
+//     type Item = i32;
+
+//     fn next(&mut self) -> Option<Self::Item> {
+
+//     }
+// }
+
+impl Default for Brightness {
+    fn default() -> Self {
+        let current = read().unwrap();
+        Brightness {
+            as_set: current,
+            current,
+        }
+    }
+}
+
+impl Brightness {
+    fn get(&mut self) -> i32 {
+        self.current = read().unwrap();
+        self.current
+    }
+
+    fn set(&mut self, val: i32) -> Result<()> {
+        write(val)?;
+        self.as_set = val;
+        self.current = val;
+        Ok(())
+    }
+
+    // fn set_smooth(&mut self, val: i32) -> Result<()> {}
+
+    // Returns Some of the new value, or None if user hasn't changed it since last set by us
+    fn changed(&mut self) -> Option<i32> {
+        let diff = self.get() - self.as_set;
+        if diff != 0 {
+            let diff = self.get() - self.as_set;
+            Some(diff)
+        } else {
+            None
+        }
+    }
+}
+
+fn read() -> Result<i32> {
+    Ok(
+        read_to_string("/sys/class/backlight/intel_backlight/brightness")?
+            .trim()
+            .parse()?,
+    )
+}
+fn write(val: i32) -> Result<()> {
+    let mut f = File::create("/sys/class/backlight/intel_backlight/brightness")?;
+    f.write_all(&val.to_string().into_bytes())?;
+    Ok(())
+}
+
+fn max() -> Result<i32> {
+    Ok(
+        read_to_string("/sys/class/backlight/intel_backlight/max_brightness")?
+            .trim()
+            .parse()?,
+    )
 }
 
 fn sensor() -> Result<i32> {
-    let a = read_to_string("/sys/bus/iio/devices/iio:device0/in_illuminance_raw")?
-        .trim()
-        .parse()?;
-    Ok(a)
-}
-
-pub enum Brightnessctl {
-    Get,
-    Set(i32),
-    Adjust(i32),
-    GetMax,
-}
-
-pub fn brightnessctl(op: Brightnessctl) -> Result<i32> {
-    use std::process::Command;
-    let mut b = Command::new("brightnessctl");
-    match op {
-        Brightnessctl::Get => {
-            b.arg("get");
-        }
-        Brightnessctl::Set(v) => {
-            b.arg("set");
-            b.arg(v.to_string());
-        }
-        Brightnessctl::Adjust(v) if v.is_negative() => {
-            b.arg("set");
-            b.arg(format!("{}-", v.abs()));
-        }
-        Brightnessctl::Adjust(v) => {
-            b.arg("set");
-            b.arg(format!("+{}", v));
-        }
-        Brightnessctl::GetMax => {
-            b.arg("max");
-        }
-    }
-
-    let b = b.output()?;
-    let b = String::from_utf8(b.stdout)?.trim().parse();
-    match b {
-        Ok(b) => Ok(b),
-        Err(_) => Ok(0),
-    }
+    Ok(
+        read_to_string("/sys/bus/iio/devices/iio:device0/in_illuminance_raw")?
+            .trim()
+            .parse()?,
+    )
 }
