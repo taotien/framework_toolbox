@@ -39,10 +39,11 @@ Copy the binary from ./target/{arch}/release
 - rust
 - ectool (DHowett/fw-ectool)
 - Polkit/pkexec
-- brightnessctl
+- brightnessctl (just the udev rules)
 
 ## TODO/Need help
 
+- bench autobright cpu consumption
 - apply all settings on start, not just battery charge
 - check if ectool needs specific options on other distros/allow users to manually change arguments
 - cleanup unecessary unwraps and expects
