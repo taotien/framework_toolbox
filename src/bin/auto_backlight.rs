@@ -15,20 +15,21 @@ fn main() -> Result<()> {
     let mut b = Brightness::default();
     let mut running = VecDeque::from([sensor()?; 10]);
     let max = max()?;
-    // let floor = Key::new(0., 100., Interpolation::Linear);
-    // let ceil = Key::new(3350., max.into(), Interpolation::default());
-    let keys = (0..10).map(|i| i * 335); //.collect();
-    let mut vals: Vec<i32> = (0..10).map(|i| i * max / 10).collect();
-    vals[0] = 100;
 
-    let mut curve: Spline<f64, f64> = Spline::from_vec(vec![]);
-    for (i, k) in keys.clone().enumerate() {
-        let k = Key::new(k.into(), vals[i].into(), Interpolation::Linear);
-        curve.add(k);
-    }
+    let floor = Key::new(0., 100., Interpolation::Linear);
+    let ceil = Key::new(3350., max.into(), Interpolation::default());
+    let mut curve = Spline::from_vec(vec![floor, ceil]);
+
+    // let keys = (0..10).map(|i| i * 335); //.collect();
+    // let mut vals: Vec<i32> = (0..10).map(|i| i * max / 10).collect();
+    // vals[0] = 100;
+    // let mut curve: Spline<f64, f64> = Spline::from_vec(vec![]);
+    // for (i, k) in keys.clone().enumerate() {
+    //     let k = Key::new(k.into(), vals[i].into(), Interpolation::Linear);
+    //     curve.add(k);
+    // }
 
     let mut interval = Duration::from_millis(SAMPLING);
-
     let mut step = 0;
     let mut target: i32;
     let mut stepper = (0..0).fuse();
@@ -73,43 +74,43 @@ fn main() -> Result<()> {
                 } else {
                     sleep(Duration::from_secs(3));
                     let avg: i32 = running.iter().sum::<i32>() / running.len() as i32;
-                    if let Some(i) = keys.clone().position(|i| (avg - i).abs() <= 167) {
-                        let current = b.get();
-                        *curve.get_mut(i).unwrap().value = current.into();
-                        vals[i] = current;
-                    };
-                    b.as_set = b.get();
-                    println!("{keys:?}\n{vals:?}");
+                    let current = b.get();
+                    b.set(current)?;
+
+                    // find if current ambient already exists
+                    if let Some(k) = curve.keys().iter().position(|&k| k.t == avg.into()) {
+                        *curve.get_mut(k).unwrap().value = current.into();
+                    } else {
+                        let k = Key::new(avg.into(), current.into(), Interpolation::Linear);
+                        curve.add(k);
+                    }
+                    println!("{:?}", curve);
+
+                    // if let Some(i) = keys.clone().position(|i| (avg - i).abs() <= 167) {
+                    //     let current = b.get();
+                    //     *curve.get_mut(i).unwrap().value = current.into();
+                    //     vals[i] = current;
+                    // };
+                    // println!("{keys:?}\n{vals:?}");
                 }
             }
         }
     }
 }
 
-fn spline_smoother(s: &mut Spline<f64, f64>, val: i32) {}
+fn curve_add(s: &mut Spline<f64, f64>, k: Key<f64, f64>) {
+    // check if k is 0 or len-1
+    let val = k.value;
+    s.add(k);
+
+    // check before
+    // s.
+}
 
 struct Brightness {
     as_set: i32,
     current: i32,
 }
-
-// struct Targeter {
-//     target: i32,
-// }
-
-// impl Targeter {
-//     fn set(&self, val: i32) {
-//         self.target = val;
-//     }
-// }
-
-// impl Iterator for Targeter {
-//     type Item = i32;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-
-//     }
-// }
 
 impl Default for Brightness {
     fn default() -> Self {
