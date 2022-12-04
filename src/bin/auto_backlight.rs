@@ -10,6 +10,8 @@ use std::time::Duration;
 const SAMPLING: u64 = 100;
 const HISTERESIS: i32 = 5000; // causes large jumps to hitch at the start, but may save cpu?
 
+// impl Spline<f64, f64> {}
+
 // TODO perhaps cache calculated curve results
 fn main() -> Result<()> {
     let mut b = Brightness::default();
@@ -17,7 +19,7 @@ fn main() -> Result<()> {
     let max = max()?;
 
     let floor = Key::new(0., 100., Interpolation::Linear);
-    let ceil = Key::new(3350., max.into(), Interpolation::default());
+    let ceil = Key::new(3355., max.into(), Interpolation::default());
     let mut curve = Spline::from_vec(vec![floor, ceil]);
 
     // let keys = (0..10).map(|i| i * 335); //.collect();
@@ -68,23 +70,29 @@ fn main() -> Result<()> {
             }
             Some(c) => {
                 // check if change was due to idle
-                // also
+                // maybe libinput can help with this?
                 if c == 23456 {
                     todo!()
                 } else {
-                    sleep(Duration::from_secs(3));
+                    sleep(Duration::from_secs(5));
                     let avg: i32 = running.iter().sum::<i32>() / running.len() as i32;
                     let current = b.get();
-                    b.set(current)?;
+                    if current < 100 {
+                        // device went to sleep, don't do anything
+                        // figure out what idel reduction is
+                        continue;
+                    }
+                    b.as_set = current;
+
+                    curve_add(&mut curve, avg.into(), current.into());
 
                     // find if current ambient already exists
-                    if let Some(k) = curve.keys().iter().position(|&k| k.t == avg.into()) {
-                        *curve.get_mut(k).unwrap().value = current.into();
-                    } else {
-                        let k = Key::new(avg.into(), current.into(), Interpolation::Linear);
-                        curve.add(k);
-                    }
-                    println!("{:?}", curve);
+                    // if let Some(k) = curve.keys().iter().position(|&k| k.t == avg.into()) {
+                    //     *curve.get_mut(k).unwrap().value = current.into();
+                    // } else {
+                    //     let k = Key::new(avg.into(), current.into(), Interpolation::Linear);
+                    //     curve.add(k);
+                    // }
 
                     // if let Some(i) = keys.clone().position(|i| (avg - i).abs() <= 167) {
                     //     let current = b.get();
@@ -98,13 +106,31 @@ fn main() -> Result<()> {
     }
 }
 
-fn curve_add(s: &mut Spline<f64, f64>, k: Key<f64, f64>) {
-    // check if k is 0 or len-1
-    let val = k.value;
-    s.add(k);
+fn curve_add(curve: &mut Spline<f64, f64>, k: f64, v: f64) {
+    // TODO check if k is idx 0 or len-1
+
+    // checks if key already exists and updates it
+    if let Some(key) = curve.keys().iter().position(|&key| key.t == k) {
+        *curve.get_mut(key).unwrap().value = v;
+    } else {
+        let k = Key::new(k, v, Interpolation::Linear);
+        curve.add(k);
+    }
 
     // check before
-    // s.
+    if let Some(idx) = curve.keys().iter().position(|&key| {
+        (key.t != 0. && key.t != 3355.)
+            && ((key.value > v && key.t < k) || (key.value < v && key.t > k))
+    }) {
+        curve.remove(idx);
+    }
+
+    for k in curve.keys().iter() {
+        for _ in 0..(k.value / 100.) as i32 {
+            print!(".");
+        }
+        println!()
+    }
 }
 
 struct Brightness {
@@ -156,11 +182,6 @@ fn read() -> Result<i32> {
             .parse()?,
     )
 }
-fn write(val: i32) -> Result<()> {
-    let mut f = File::create("/sys/class/backlight/intel_backlight/brightness")?;
-    f.write_all(&val.to_string().into_bytes())?;
-    Ok(())
-}
 
 fn max() -> Result<i32> {
     Ok(
@@ -168,6 +189,12 @@ fn max() -> Result<i32> {
             .trim()
             .parse()?,
     )
+}
+
+fn write(val: i32) -> Result<()> {
+    let mut f = File::create("/sys/class/backlight/intel_backlight/brightness")?;
+    f.write_all(&val.to_string().into_bytes())?;
+    Ok(())
 }
 
 fn sensor() -> Result<i32> {
