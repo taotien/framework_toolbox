@@ -13,11 +13,20 @@ before installation**
 cargo install --git "https://github.com/taotien/framework_toolbox.git"
 ```
 
-Add cargo's bin folder to your desktop environment's PATH.
+Add cargo's bin folder to your *desktop environment's* PATH.
 
 ```sh
 # do as root
 desktop-file-install fwtb.desktop
+```
+
+Copy `90-intel_backlight.udev` to `/etc/udev/rules.d/`.
+
+Add your account to the `video` group, then run
+
+```sh
+# do as root
+udevadm control --reload
 ```
 
 ### If you want just the auto-brightness
@@ -43,11 +52,11 @@ Copy the binary from ./target/{arch}/release
 
 ## TODO/Need help
 
+- run fwtb-ab with pkexec or include udev rules
 - bench autobright cpu consumption
 - apply all settings on start, not just battery charge
 - check if ectool needs specific options on other distros/allow users to manually change arguments
 - cleanup unecessary unwraps and expects
-- remove dependency on brightnessctl
 - Windows support
 - package binaries
 - text input values for sliders

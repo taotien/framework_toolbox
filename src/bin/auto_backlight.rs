@@ -10,9 +10,8 @@ use std::time::Duration;
 const SAMPLING: u64 = 100;
 const HISTERESIS: i32 = 5000; // causes large jumps to hitch at the start, but may save cpu?
 
-// impl Spline<f64, f64> {}
-
 // TODO perhaps cache calculated curve results
+// TODO use mki to hook global hotkeys so we don't have to do janky detection
 fn main() -> Result<()> {
     let mut b = Brightness::default();
     let mut running = VecDeque::from([sensor()?; 10]);
@@ -21,15 +20,6 @@ fn main() -> Result<()> {
     let floor = Key::new(0., 100., Interpolation::Linear);
     let ceil = Key::new(3355., max.into(), Interpolation::default());
     let mut curve = Spline::from_vec(vec![floor, ceil]);
-
-    // let keys = (0..10).map(|i| i * 335); //.collect();
-    // let mut vals: Vec<i32> = (0..10).map(|i| i * max / 10).collect();
-    // vals[0] = 100;
-    // let mut curve: Spline<f64, f64> = Spline::from_vec(vec![]);
-    // for (i, k) in keys.clone().enumerate() {
-    //     let k = Key::new(k.into(), vals[i].into(), Interpolation::Linear);
-    //     curve.add(k);
-    // }
 
     let mut interval = Duration::from_millis(SAMPLING);
     let mut step = 0;
@@ -69,46 +59,30 @@ fn main() -> Result<()> {
                 }
             }
             Some(c) => {
+                // TODO
                 // check if change was due to idle
+                // on KDE it's 50% of set, then 25% of that
                 // maybe libinput can help with this?
-                if c == 23456 {
-                    todo!()
-                } else {
-                    sleep(Duration::from_secs(5));
-                    let avg: i32 = running.iter().sum::<i32>() / running.len() as i32;
-                    let current = b.get();
-                    if current < 100 {
-                        // device went to sleep, don't do anything
-                        // figure out what idel reduction is
-                        continue;
-                    }
-                    b.as_set = current;
-
-                    curve_add(&mut curve, avg.into(), current.into());
-
-                    // find if current ambient already exists
-                    // if let Some(k) = curve.keys().iter().position(|&k| k.t == avg.into()) {
-                    //     *curve.get_mut(k).unwrap().value = current.into();
-                    // } else {
-                    //     let k = Key::new(avg.into(), current.into(), Interpolation::Linear);
-                    //     curve.add(k);
-                    // }
-
-                    // if let Some(i) = keys.clone().position(|i| (avg - i).abs() <= 167) {
-                    //     let current = b.get();
-                    //     *curve.get_mut(i).unwrap().value = current.into();
-                    //     vals[i] = current;
-                    // };
-                    // println!("{keys:?}\n{vals:?}");
+                // if c == 23456 {
+                //     todo!()
+                // } else {
+                sleep(Duration::from_secs(5));
+                let avg: i32 = running.iter().sum::<i32>() / running.len() as i32;
+                let current = b.get();
+                if current < 100 {
+                    // device went to sleep, don't do anything
+                    // figure out what idel reduction is
+                    continue;
                 }
+                b.as_set = current;
+
+                curve_add(&mut curve, avg.into(), current.into());
             }
         }
     }
 }
 
 fn curve_add(curve: &mut Spline<f64, f64>, k: f64, v: f64) {
-    // TODO check if k is idx 0 or len-1
-
     // checks if key already exists and updates it
     if let Some(key) = curve.keys().iter().position(|&key| key.t == k) {
         *curve.get_mut(key).unwrap().value = v;
@@ -117,20 +91,20 @@ fn curve_add(curve: &mut Spline<f64, f64>, k: f64, v: f64) {
         curve.add(k);
     }
 
-    // check before
+    // check if there are values above or below this key that make sign of slope inconsistent
     if let Some(idx) = curve.keys().iter().position(|&key| {
         (key.t != 0. && key.t != 3355.)
             && ((key.value > v && key.t < k) || (key.value < v && key.t > k))
     }) {
-        curve.remove(idx);
+        *curve.get_mut(idx).unwrap().value = v;
     }
 
-    for k in curve.keys().iter() {
-        for _ in 0..(k.value / 100.) as i32 {
-            print!(".");
-        }
-        println!()
-    }
+    // for k in curve.keys().iter() {
+    //     for _ in 0..(k.value / 1000.) as i32 {
+    //         print!(".");
+    //     }
+    //     println!()
+    // }
 }
 
 struct Brightness {
@@ -199,6 +173,7 @@ fn write(val: i32) -> Result<()> {
 
 fn sensor() -> Result<i32> {
     Ok(
+        // read_to_string("sensor")?
         read_to_string("/sys/bus/iio/devices/iio:device0/in_illuminance_raw")?
             .trim()
             .parse()?,
