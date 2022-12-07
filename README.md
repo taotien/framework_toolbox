@@ -48,11 +48,16 @@ Copy the binary from ./target/{arch}/release
 - rust
 - ectool (DHowett/fw-ectool)
 - Polkit/pkexec
-- brightnessctl (just the udev rules)
+
+## Planned Features
+
+- Status monitor using LEDs; battery, temperature, cpu, etc.
+- Battery oneshot mode
+- Charge rate limiter
+- Fan curves
 
 ## TODO/Need help
 
-- run fwtb-ab with pkexec or include udev rules
 - bench autobright cpu consumption
 - apply all settings on start, not just battery charge
 - check if ectool needs specific options on other distros/allow users to manually change arguments
@@ -66,4 +71,3 @@ Copy the binary from ./target/{arch}/release
   ambient light sensor
 - keyboard remapping
 - find better way of communication with "daemon"
-- fan curves based on temperature

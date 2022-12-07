@@ -17,7 +17,7 @@ fn main() -> Result<()> {
     let mut running = VecDeque::from([sensor()?; 10]);
     let max = max()?;
 
-    let floor = Key::new(0., 100., Interpolation::Linear);
+    let floor = Key::new(0., 1., Interpolation::Linear);
     let ceil = Key::new(3355., max.into(), Interpolation::default());
     let mut curve = Spline::from_vec(vec![floor, ceil]);
 
@@ -69,9 +69,8 @@ fn main() -> Result<()> {
                 sleep(Duration::from_secs(5));
                 let avg: i32 = running.iter().sum::<i32>() / running.len() as i32;
                 let current = b.get();
-                if current < 100 {
+                if current == 0 {
                     // device went to sleep, don't do anything
-                    // figure out what idel reduction is
                     continue;
                 }
                 b.as_set = current;
