@@ -10,6 +10,7 @@ use std::time::Duration;
 const SAMPLING: u64 = 100;
 const HISTERESIS: i32 = 5000; // causes large jumps to hitch at the start, but may save cpu?
 
+// TODO histeresis based on sensor rather than after math
 // TODO perhaps cache calculated curve results
 // TODO use mki to hook global hotkeys so we don't have to do janky detection
 fn main() -> Result<()> {
@@ -35,7 +36,7 @@ fn main() -> Result<()> {
                 let avg: i32 = running.iter().sum::<i32>() / running.len() as i32;
                 target = curve.clamped_sample(avg.into()).unwrap() as i32;
                 let diff = target - b.get();
-                println!("{target}, {diff}");
+                // println!("{target}, {diff}");
                 match stepper.next() {
                     None => {
                         if diff != 0 && diff.abs() > HISTERESIS {

@@ -111,16 +111,35 @@ impl Application for Toolbox {
         let mut tb: Toolbox;
         let mut conf = dirs::config_dir().unwrap();
         conf.push("fwtb.toml");
+        let mut from_conf = false;
         match read_to_string(conf) {
             Ok(s) => {
                 tb = toml_edit::easy::from_str(&s).unwrap_or_default();
+                from_conf = true;
             }
             Err(_) => {
                 tb = Toolbox::default();
             }
         }
-
         tb.daemon = Some(daemon_stdin);
+
+        if from_conf {
+            if tb.fan_auto {
+                daemon_write(tb.daemon.as_ref(), "autofanctrl", "");
+            } else {
+                daemon_write(tb.daemon.as_ref(), "fanduty", tb.fan_duty);
+            }
+            if let Some(value) = tb.led_power {
+                daemon_write(tb.daemon.as_ref(), "led power", value);
+            }
+            if let Some(value) = tb.led_left {
+                daemon_write(tb.daemon.as_ref(), "led left", value);
+            }
+            if let Some(value) = tb.led_right {
+                daemon_write(tb.daemon.as_ref(), "led right", value);
+            }
+        }
+
         if tb.backlight_auto {
             tb.backlight_daemon = Some(
                 Command::new("fwtb-ab")
@@ -134,8 +153,8 @@ impl Application for Toolbox {
 
     fn subscription(&self) -> Subscription<Message> {
         let subs = vec![
-            iced_native::subscription::events().map(Message::Event),
-            iced::time::every(Duration::from_secs(5)).map(|_| Message::Update), // dunno why a closure is needed here
+            iced_native::subscription::events().map(Message::Event), // dunno why no closure here
+            iced::time::every(Duration::from_secs(5)).map(|_| Message::Update),
         ];
         iced_native::Subscription::batch(subs)
     }
@@ -156,7 +175,7 @@ impl Application for Toolbox {
                 if !value {
                     daemon_write(self.daemon.as_ref(), "fanduty", value);
                 } else {
-                    daemon_write::<&str>(self.daemon.as_ref(), "autofanctrl", "");
+                    daemon_write(self.daemon.as_ref(), "autofanctrl", "");
                 }
             }
             Message::BacklightAutoToggled(value) => {
@@ -184,7 +203,7 @@ impl Application for Toolbox {
                 daemon_write(self.daemon.as_ref(), "led right", value);
             }
             Message::Update => {
-                daemon_write(self.daemon.as_ref(), "fwchargelimit", self.battery_limit)
+                daemon_write(self.daemon.as_ref(), "fwchargelimit", self.battery_limit);
             }
             Message::Save => {
                 let toml = toml_edit::easy::to_string(&self).unwrap();
@@ -335,6 +354,7 @@ impl Application for Toolbox {
         container(content).center_x().into()
     }
 }
+
 fn daemon_write<T>(daemon: Option<&ChildStdin>, target: &str, value: T)
 where
     T: std::fmt::Display,
