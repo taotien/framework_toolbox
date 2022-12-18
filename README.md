@@ -59,7 +59,7 @@ Copy the binary from ./target/{arch}/release
 ## TODO/Need help
 
 - bench autobright cpu consumption
-- apply all settings on start, not just battery charge
+- figure out why leds stay on after shutdown
 - check if ectool needs specific options on other distros/allow users to manually change arguments
 - cleanup unecessary unwraps and expects
 - Windows support

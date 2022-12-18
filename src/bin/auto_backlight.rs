@@ -7,22 +7,24 @@ use std::io::Write;
 use std::thread::sleep;
 use std::time::Duration;
 
-const SAMPLING: u64 = 100;
-const HISTERESIS: i32 = 5000; // causes large jumps to hitch at the start, but may save cpu?
+const SAMPLES_TO_TAKE: usize = 10;
+const SAMPLE_MS: u64 = 100;
+const HISTERESIS: i32 = 5000; // maybe causes large jumps to hitch at the start, but may save cpu?
 
 // TODO histeresis based on sensor rather than after math
+// TODO increase histeresis if ambient is fluctuating a lot
 // TODO perhaps cache calculated curve results
 // TODO use mki to hook global hotkeys so we don't have to do janky detection
 fn main() -> Result<()> {
     let mut b = Brightness::default();
-    let mut running = VecDeque::from([sensor()?; 10]);
+    let mut running = VecDeque::from([sensor()?; SAMPLES_TO_TAKE]);
     let max = max()?;
 
     let floor = Key::new(0., 1., Interpolation::Linear);
     let ceil = Key::new(3355., max.into(), Interpolation::default());
     let mut curve = Spline::from_vec(vec![floor, ceil]);
 
-    let mut interval = Duration::from_millis(SAMPLING);
+    let mut interval = Duration::from_millis(SAMPLE_MS);
     let mut step = 0;
     let mut target: i32;
     let mut stepper = (0..0).fuse();
@@ -54,7 +56,7 @@ fn main() -> Result<()> {
                         b.set(adj)?;
                         if i == 59 || b.get() == target {
                             stepper = (0..0).fuse();
-                            interval = Duration::from_millis(SAMPLING);
+                            interval = Duration::from_millis(SAMPLE_MS);
                         }
                     }
                 }
