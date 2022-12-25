@@ -20,7 +20,7 @@ pub fn main() -> iced::Result {
     Toolbox::run(Settings {
         exit_on_close_request: false,
         window: iced::window::Settings {
-            size: (400, 450),
+            size: (400, 500),
             resizable: false,
             ..iced::window::Settings::default()
         },
@@ -67,6 +67,7 @@ impl Default for Toolbox {
 pub enum Message {
     Event(Event),
     BatteryLimitChanged(u8),
+    BatteryOneShot,
     FanDutyChanged(u8),
     FanAutoToggled(bool),
     BacklightAutoToggled(bool),
@@ -165,6 +166,9 @@ impl Application for Toolbox {
                 self.battery_limit = value;
                 daemon_write(self.daemon.as_ref(), "fwchargelimit", value);
             }
+            Message::BatteryOneShot => {
+                daemon_write(self.daemon.as_ref(), "fwchargelimit", "100 once");
+            }
             Message::FanDutyChanged(value) => {
                 self.fan_duty = value;
                 self.fan_auto = false;
@@ -237,12 +241,14 @@ impl Application for Toolbox {
             .style(Color::from([0.5, 0.5, 0.5]))
             .horizontal_alignment(alignment::Horizontal::Center);
 
+        let space = 10;
+
         // Battery stuff
         //
         let battery_limit_slider =
             slider(40..=100, self.battery_limit, Message::BatteryLimitChanged);
 
-        let battery_controls = row![
+        let battery_limit_row = row![
             text("40%")
                 .width(Length::Fill)
                 .horizontal_alignment(alignment::Horizontal::Right),
@@ -252,6 +258,24 @@ impl Application for Toolbox {
                 .horizontal_alignment(alignment::Horizontal::Left),
         ]
         .spacing(10);
+
+        let battery_oneshot_row = row![
+            text("Charge to 100% until unplugged:")
+                .width(Length::Fill)
+                .horizontal_alignment(alignment::Horizontal::Right),
+            button("100%").on_press(Message::BatteryOneShot),
+        ]
+        .align_items(Alignment::Center)
+        .spacing(space)
+        .padding(space);
+
+        let battery_controls = column![
+            text(format!("Battery Limit: {}%", self.battery_limit)),
+            battery_limit_row,
+            battery_oneshot_row
+        ]
+        .align_items(Alignment::Center)
+        .spacing(space);
 
         // Fan stuff
         //
@@ -266,12 +290,26 @@ impl Application for Toolbox {
                 .width(Length::Fill)
                 .horizontal_alignment(alignment::Horizontal::Left)
         ]
-        .spacing(10);
+        .spacing(space);
 
         let fan_auto_toggler =
             toggler(String::from("Auto"), self.fan_auto, Message::FanAutoToggled)
                 .text_alignment(alignment::Horizontal::Right)
-                .spacing(10);
+                .spacing(space);
+
+        let fan_controls = column![
+            text(format!("Fan Duty: {}", {
+                if self.fan_auto {
+                    "Auto".to_string()
+                } else {
+                    format!("{}%", self.fan_duty)
+                }
+            })),
+            fan_duty_row,
+            fan_auto_toggler
+        ]
+        .align_items(Alignment::Center)
+        .spacing(space);
 
         // Backlight stuff
         //
@@ -281,9 +319,22 @@ impl Application for Toolbox {
             Message::BacklightAutoToggled,
         )
         .text_alignment(alignment::Horizontal::Right)
-        .spacing(10);
+        .spacing(space);
 
-        // LED STuff
+        let backlight_controls = column![
+            text(format!("Backlight: {}", {
+                if self.backlight_auto {
+                    "Auto".to_string()
+                } else {
+                    "Manual".to_string()
+                }
+            })),
+            backlight_auto_toggler,
+        ]
+        .align_items(Alignment::Center)
+        .spacing(space);
+
+        // LED space
         //
         let led_left_picker =
             pick_list(&LedColor::ALL[..], self.led_left, Message::LEDLeftSelected);
@@ -304,17 +355,21 @@ impl Application for Toolbox {
             column![text("Left"), led_left_picker,]
                 .width(Length::Fill)
                 .align_items(Alignment::Center)
-                .spacing(10),
+                .spacing(space),
             column![text("Power"), led_power_picker,]
                 .width(Length::Fill)
                 .align_items(Alignment::Center)
-                .spacing(10),
+                .spacing(space),
             column![text("Right"), led_right_picker,]
                 .align_items(Alignment::Center)
                 .width(Length::Fill)
-                .spacing(10),
+                .spacing(space),
         ]
-        .spacing(10);
+        .spacing(space);
+
+        let led_controls = column![text("LED Colors"), led_row,]
+            .align_items(Alignment::Center)
+            .spacing(space);
 
         // Everything stuff
         //
@@ -322,31 +377,14 @@ impl Application for Toolbox {
             title,
             horizontal_rule(5),
             horizontal_space(Length::Fill),
-            text(format!("Battery Limit: {}%", self.battery_limit)),
             battery_controls,
-            text(format!("Fan Duty: {}", {
-                if self.fan_auto {
-                    "Auto".to_string()
-                } else {
-                    format!("{}%", self.fan_duty)
-                }
-            })),
-            fan_duty_row,
-            fan_auto_toggler,
-            text(format!("Backlight: {}", {
-                if self.backlight_auto {
-                    "Auto".to_string()
-                } else {
-                    "Manual".to_string()
-                }
-            })),
-            backlight_auto_toggler,
-            text("LED Colors"),
-            led_row,
+            fan_controls,
+            backlight_controls,
+            led_controls,
             button("Save").on_press(Message::Save),
         ]
-        .spacing(10)
-        .padding(10)
+        .spacing(space)
+        .padding(space)
         .align_items(Alignment::Center)
         .into();
 

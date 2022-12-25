@@ -7,7 +7,7 @@ use std::io::Write;
 use std::thread::sleep;
 use std::time::Duration;
 
-const SAMPLES_TO_TAKE: usize = 10;
+const SAMPLES_TO_TAKE: usize = 100;
 const SAMPLE_MS: u64 = 100;
 const HISTERESIS: i32 = 5000; // maybe causes large jumps to hitch at the start, but may save cpu?
 
