@@ -177,7 +177,7 @@ impl Application for Toolbox {
             Message::FanAutoToggled(value) => {
                 self.fan_auto = value;
                 if !value {
-                    daemon_write(self.daemon.as_ref(), "fanduty", value);
+                    daemon_write(self.daemon.as_ref(), "fanduty", self.fan_duty);
                 } else {
                     daemon_write(self.daemon.as_ref(), "autofanctrl", "");
                 }
