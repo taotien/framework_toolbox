@@ -1,6 +1,6 @@
 [package]
 name = "framework_toolbox"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 
 default-run = "fwtb"
@@ -27,4 +27,5 @@ dirs = "4.0.0"
 iced = {version = "0.5.2", features = ["tokio"]}
 iced_native = "0.6.1"
 iced_lazy = "0.2.0"
+tokio = { version = "1.25.0", features = ["full"] }
 # brightness = {version = "0.5.0", features = ["blocking"]}

@@ -1,7 +1,6 @@
 use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::time::Duration;
 
 use iced::widget::{
     button, column, container, horizontal_rule, horizontal_space, pick_list, row, slider, text,
@@ -74,7 +73,6 @@ pub enum Message {
     LEDPowerSelected(LedColor),
     LEDLeftSelected(LedColor),
     LEDRightSelected(LedColor),
-    Update,
     // Apply,
     Save,
 }
@@ -103,6 +101,7 @@ impl Application for Toolbox {
             .arg("fwtbd")
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .expect("failed to open daemon");
         // hold onto the stdin to communicate and keep process alive
@@ -125,6 +124,7 @@ impl Application for Toolbox {
         tb.daemon = Some(daemon_stdin);
 
         if from_conf {
+            daemon_write(tb.daemon.as_ref(), "fwchargelimit", tb.battery_limit);
             if tb.fan_auto {
                 daemon_write(tb.daemon.as_ref(), "autofanctrl", "");
             } else {
@@ -152,10 +152,11 @@ impl Application for Toolbox {
         (tb, iced::Command::none())
     }
 
+    // TODO remove this
     fn subscription(&self) -> Subscription<Message> {
         let subs = vec![
-            iced_native::subscription::events().map(Message::Event), // dunno why no closure here
-            iced::time::every(Duration::from_secs(5)).map(|_| Message::Update),
+            // dunno why no closure here
+            iced_native::subscription::events().map(Message::Event),
         ];
         iced_native::Subscription::batch(subs)
     }
@@ -205,9 +206,6 @@ impl Application for Toolbox {
             Message::LEDRightSelected(value) => {
                 self.led_right = Some(value);
                 daemon_write(self.daemon.as_ref(), "led right", value);
-            }
-            Message::Update => {
-                daemon_write(self.daemon.as_ref(), "fwchargelimit", self.battery_limit);
             }
             Message::Save => {
                 let toml = toml_edit::easy::to_string(&self).unwrap();
