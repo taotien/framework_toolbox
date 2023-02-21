@@ -8,33 +8,32 @@ use tokio::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let minute = Duration::from_secs(60);
+    let minute = Duration::from_secs(5);
     let mut minago = Instant::now();
 
     let stdin = io::stdin();
     let reader = BufReader::new(stdin);
     let mut input = reader.lines();
 
-    let mut lastargs = String::new();
+    let mut lastbatt = String::new();
 
     loop {
         tokio::select! {
             _ = sleep(minute) => {
                 // likely slept/hiber if this diffs too much
-                if minago.elapsed() >= Duration::from_secs(69) {
-                    ectool(&lastargs);
+                if minago.elapsed() >= Duration::from_secs(10) {
+                    ectool(&lastbatt);
                 }
                 minago = Instant::now();
             }
 
             line = input.next_line() => {
                 let line = line?;
-                match line {
-                    Some(l) =>{
-                        ectool(&l);
-                        lastargs = l;
-                        }
-                    None => {panic!()}
+                if let Some(l) = line {
+                    ectool(&l);
+                    if l.contains("fwchargelimit") {
+                        lastbatt = l;
+                    }
                 }
             }
         }
