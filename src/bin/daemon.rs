@@ -8,14 +8,14 @@ use tokio::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let minute = Duration::from_secs(5);
-    let mut minago = Instant::now();
-
     let stdin = io::stdin();
     let reader = BufReader::new(stdin);
     let mut input = reader.lines();
 
     let mut lastbatt = String::new();
+
+    let minute = Duration::from_secs(5);
+    let mut minago = Instant::now();
 
     loop {
         tokio::select! {
