@@ -30,10 +30,14 @@ async fn main() -> Result<()> {
             line = input.next_line() => {
                 let line = line?;
                 if let Some(l) = line {
+                    // TODO remove this hack
+                    if l.contains("exit") {
+                        std::process::exit(0);
+                    } else {
                     ectool(&l);
                     if l.contains("fwchargelimit") {
                         lastbatt = l;
-                    }
+                    }}
                 }
             }
         }

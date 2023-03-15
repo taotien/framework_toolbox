@@ -225,6 +225,10 @@ impl Application for Toolbox {
                     if let Some(c) = &mut self.backlight_daemon {
                         c.kill().expect("couldn't kill autobacklight");
                     }
+                    if let Some(c) = &mut self.daemon {
+                        // TODO temporary hack
+                        daemon_write(self.daemon.as_ref(), "exit", "");
+                    }
                     self.should_exit = true;
                 }
             }
