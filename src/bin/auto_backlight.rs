@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-const SAMPLE_SIZE: usize = 6000;
+const SAMPLE_SIZE: usize = 100;
 const SAMPLE_INTERVAL_MS: u64 = 100;
 const BPS: u64 = 60;
 const HISTERESIS: i32 = 5000;
@@ -72,10 +72,11 @@ fn main() -> Result<()> {
 
             // wait for user to finish adjusting
             sleep(Duration::from_secs(5));
+            interval = Duration::from_millis(SAMPLE_INTERVAL_MS);
 
             let avg: i32 = samples.iter().sum::<i32>() / samples.len() as i32;
             let current = Brightness::get()?;
-            if current != 0 {
+            if current == 0 {
                 // display set to black (likely from sleep), do nothing
                 continue;
             }
@@ -85,6 +86,7 @@ fn main() -> Result<()> {
             stepper = (0..0).fuse().peekable();
 
             curve.monotonic_add(avg.into(), current.into());
+            println!("{:?}", curve);
         }
     }
 }
@@ -100,7 +102,7 @@ impl Monotonic<f64, f64> for Spline<f64, f64> {
             *self.get_mut(key).unwrap().value = v;
         } else {
             let k = Key::new(k, v, Interpolation::default());
-            self.add(k)
+            self.add(k);
         }
 
         // make keys with values in the wrong direction consistent
@@ -108,7 +110,7 @@ impl Monotonic<f64, f64> for Spline<f64, f64> {
             (key.t != 0. && key.t != 3355.)
                 && ((key.value > v && key.t < k) || (key.value < v && key.t > k))
         }) {
-            *self.get_mut(idx).unwrap().value = v
+            *self.get_mut(idx).unwrap().value = v;
         }
     }
 }
