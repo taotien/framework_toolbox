@@ -25,9 +25,10 @@ fn main() -> Result<()> {
     let ceil = Key::new(3355., b.max.into(), Interpolation::default());
     let mut curve = Spline::from_vec(vec![floor, ceil]);
 
-    let mut interval = Duration::from_millis(SAMPLE_INTERVAL_MS);
+    let sample_interval = Duration::from_millis(SAMPLE_INTERVAL_MS);
+    let adjust_interval = Duration::from_millis(1000 / BPS);
+    let mut interval = sample_interval;
     let mut step = 0;
-    let mut target: i32;
     let mut stepper = (0..0).fuse().peekable();
     loop {
         sleep(interval);
@@ -36,15 +37,15 @@ fn main() -> Result<()> {
             // brightness wasn't changed externally, keep sampling and transitioning
             samples.pop_front();
             samples.push_back(sensor()?);
-            let avg: i32 = samples.iter().sum::<i32>() / samples.len() as i32;
-            target = curve.clamped_sample(avg.into()).unwrap() as i32;
+            let avg = samples.iter().sum::<i32>() / samples.len() as i32;
+            let target = curve.clamped_sample(avg.into()).unwrap() as i32;
             let diff = target - Brightness::get()?;
             match stepper.next() {
                 None => {
                     if diff != 0 && diff.abs() > HISTERESIS {
                         step = diff / BPS as i32;
                         stepper = (0..BPS).fuse().peekable();
-                        interval = Duration::from_millis(1000 / BPS);
+                        interval = adjust_interval;
                     }
                 }
                 Some(_) => {
@@ -55,7 +56,7 @@ fn main() -> Result<()> {
                     b.set(adjust)?;
                     if stepper.peek().is_none() || Brightness::get()? == target {
                         stepper = (0..0).fuse().peekable();
-                        interval = Duration::from_millis(SAMPLE_INTERVAL_MS);
+                        interval = sample_interval;
                     }
                 }
             }
@@ -72,9 +73,9 @@ fn main() -> Result<()> {
 
             // wait for user to finish adjusting
             sleep(Duration::from_secs(5));
-            interval = Duration::from_millis(SAMPLE_INTERVAL_MS);
+            interval = sample_interval;
 
-            let avg: i32 = samples.iter().sum::<i32>() / samples.len() as i32;
+            let avg = samples.iter().sum::<i32>() / samples.len() as i32;
             let current = Brightness::get()?;
             if current == 0 {
                 // display set to black (likely from sleep), do nothing
@@ -86,7 +87,6 @@ fn main() -> Result<()> {
             stepper = (0..0).fuse().peekable();
 
             curve.monotonic_add(avg.into(), current.into());
-            println!("{:?}", curve);
         }
     }
 }

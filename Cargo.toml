@@ -28,4 +28,5 @@ iced = {version = "0.5.2", features = ["tokio"]}
 iced_native = "0.6.1"
 iced_lazy = "0.2.0"
 tokio = { version = "1.25.0", features = ["full"] }
+console-subscriber = "0.1.8"
 # brightness = {version = "0.5.0", features = ["blocking"]}
