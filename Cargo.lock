@@ -811,6 +811,7 @@ dependencies = [
  "splines",
  "tokio",
  "toml_edit 0.15.0",
+ "tracing",
 ]
 
 [[package]]
