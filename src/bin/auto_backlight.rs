@@ -1,93 +1,183 @@
 use anyhow::Result;
 use splines::{Interpolation, Key, Spline};
+use tokio::{
+    fs::{read_to_string, write},
+    join, spawn,
+    task::JoinHandle,
+    time::sleep,
+};
 
 use std::{
     collections::VecDeque,
-    fs::{read_to_string, write},
-    thread::sleep,
+    sync::{atomic::AtomicU32, atomic::Ordering, Arc},
     time::Duration,
 };
 
-const SAMPLE_SIZE: usize = 100;
+const SAMPLE_SIZE: u32 = 100;
 const SAMPLE_INTERVAL_MS: u64 = 100;
-const BPS: u64 = 60;
-const HISTERESIS: i32 = 5000;
+const FPS: u32 = 60;
+const TPF: u64 = 1000 / FPS as u64;
+// const HISTERESIS: u32 = 5000;
 
-// TODO histeresis based on sensor rather than after math
-// TODO increase histeresis if ambient is fluctuating a lot
-// TODO perhaps cache calculated curve results
-// TODO use mki to hook global hotkeys so we don't have to do janky detection
-fn main() -> Result<()> {
-    let mut b = Brightness::new();
-    let mut samples = VecDeque::from([sensor()?; SAMPLE_SIZE]);
+#[tokio::main]
+async fn main() -> Result<()> {
+    #[cfg(tokio_unstable)]
+    console_subscriber::init();
 
-    let floor = Key::new(0., 1., Interpolation::default());
-    let ceil = Key::new(3355., b.max.into(), Interpolation::default());
-    let mut curve = Spline::from_vec(vec![floor, ceil]);
+    let mut backlight = Backlight::new().await?;
+    let mut sensor = Sensor::new().await?;
+    let average = Arc::new(AtomicU32::new(Sensor::get().await?));
 
-    let sample_interval = Duration::from_millis(SAMPLE_INTERVAL_MS);
-    let adjust_interval = Duration::from_millis(1000 / BPS);
-    let mut interval = sample_interval;
-    let mut step = 0;
-    let mut stepper = (0..0).fuse().peekable();
-    loop {
-        sleep(interval);
-
-        if !b.changed()? {
-            // brightness wasn't changed externally, keep sampling and transitioning
-            samples.pop_front();
-            samples.push_back(sensor()?);
-            let avg = samples.iter().sum::<i32>() / samples.len() as i32;
-            let target = curve.clamped_sample(avg.into()).unwrap() as i32;
-            let diff = target - Brightness::get()?;
-            match stepper.next() {
-                None => {
-                    if diff != 0 && diff.abs() > HISTERESIS {
-                        step = diff / BPS as i32;
-                        stepper = (0..BPS).fuse().peekable();
-                        interval = adjust_interval;
-                    }
-                }
-                Some(_) => {
-                    if step == 0 {
-                        step = if diff > 0 { 1 } else { -1 };
-                    }
-                    let adjust = Brightness::get()? + step;
-                    b.set(adjust)?;
-                    if stepper.peek().is_none() || Brightness::get()? == target {
-                        stepper = (0..0).fuse().peekable();
-                        interval = sample_interval;
-                    }
-                }
-            }
-        } else {
-            // brightness was adjusted externally
-
-            // TODO
-            // check if change was due to idle
-            // on KDE it's 50% of set, then 25% of that
-            // maybe libinput can help with this?
-            // if c == 23456 {
-            //     todo!()
-            // } else {
-
-            // wait for user to finish adjusting
-            sleep(Duration::from_secs(5));
-            interval = sample_interval;
-
-            let avg = samples.iter().sum::<i32>() / samples.len() as i32;
-            let current = Brightness::get()?;
-            if current == 0 {
-                // display set to black (likely from sleep), do nothing
-                continue;
-            }
-            b.requested = current;
-
-            // don't resume previous adjustment
-            stepper = (0..0).fuse().peekable();
-
-            curve.monotonic_add(avg.into(), current.into());
+    let avg = average.clone();
+    let sample: JoinHandle<Result<()>> = spawn(async move {
+        loop {
+            sensor.sample().await?;
+            avg.store(
+                sensor.samples.iter().sum::<u32>() / SAMPLE_SIZE,
+                Ordering::Relaxed,
+            );
+            sleep(Duration::from_millis(SAMPLE_INTERVAL_MS)).await;
         }
+    });
+
+    let avg = average.clone();
+    let adjust_retain: JoinHandle<Result<()>> = spawn(async move {
+        loop {
+            if !backlight.changed().await? {
+                let d;
+                if Backlight::get().await? != backlight.target {
+                    backlight.adjust().await?;
+                    d = Duration::from_millis(TPF);
+                } else {
+                    d = Duration::from_millis(SAMPLE_INTERVAL_MS * 10);
+                }
+                backlight.prepare(avg.load(Ordering::Relaxed)).await?;
+                sleep(d).await;
+            } else {
+                backlight.retain(avg.load(Ordering::Relaxed)).await?;
+            }
+        }
+    });
+
+    let _ = join![sample, adjust_retain];
+    unreachable!()
+}
+
+struct Sensor {
+    samples: VecDeque<u32>,
+}
+
+impl Sensor {
+    async fn sample(&mut self) -> Result<()> {
+        self.samples.pop_front();
+        self.samples.push_back(Self::get().await?);
+        Ok(())
+    }
+
+    async fn get() -> Result<u32> {
+        Ok(
+            read_to_string("/sys/bus/iio/devices/iio:device0/in_illuminance_raw")
+                .await?
+                .trim()
+                .parse()?,
+        )
+    }
+    async fn new() -> Result<Self> {
+        let samples = VecDeque::from([Self::get().await?; SAMPLE_SIZE as usize]);
+        Ok(Self { samples })
+    }
+}
+
+struct Backlight {
+    requested: u32,
+    target: u32,
+    diff: i32,
+    step: i32,
+    curve: Spline<f32, f32>,
+}
+
+impl Backlight {
+    async fn prepare(&mut self, s: u32) -> Result<()> {
+        self.target = self.curve.clamped_sample(s as f32).unwrap() as u32;
+        self.diff = self.target as i32 - Self::get().await? as i32;
+        self.step = self.diff / FPS as i32;
+        Ok(())
+    }
+
+    async fn adjust(&mut self) -> Result<()> {
+        self.diff = self.target as i32 - Self::get().await? as i32;
+        if self.step == 0 {
+            self.step = if self.diff > 0 { 1 } else { -1 }
+        }
+        let v = Self::get().await? as i32 + self.step;
+        if v < 0 {
+            return Ok(());
+        }
+        self.set(v as u32).await?;
+        Ok(())
+    }
+
+    async fn retain(&mut self, s: u32) -> Result<()> {
+        sleep(Duration::from_secs(5)).await;
+        let current = Self::get().await?;
+
+        if current == 0 {
+            return Ok(());
+        }
+
+        self.requested = current;
+        self.curve.monotonic_add(s as f32, current as f32);
+        self.prepare(s).await?;
+        Ok(())
+    }
+
+    async fn changed(&self) -> Result<bool> {
+        Ok(Self::get().await? as i32 - self.requested as i32 != 0)
+    }
+
+    async fn get() -> Result<u32> {
+        Ok(
+            read_to_string("/sys/class/backlight/intel_backlight/brightness")
+                .await?
+                .trim()
+                .parse()?,
+        )
+    }
+
+    async fn set(&mut self, val: u32) -> Result<()> {
+        write(
+            "/sys/class/backlight/intel_backlight/brightness",
+            val.to_string(),
+        )
+        .await?;
+        self.requested = val;
+        Ok(())
+    }
+
+    async fn max() -> Result<u32> {
+        Ok(
+            read_to_string("/sys/class/backlight/intel_backlight/max_brightness")
+                .await?
+                .trim()
+                .parse()?,
+        )
+    }
+    async fn new() -> Result<Self> {
+        let current = Self::get().await?;
+        let requested = current;
+        let target = current;
+        let diff = 0;
+        let step = 0;
+        let floor = Key::new(0., 1., Interpolation::default());
+        let ceil = Key::new(3355., Self::max().await? as f32, Interpolation::default());
+        let curve = Spline::from_vec(vec![floor, ceil]);
+        Ok(Self {
+            requested,
+            target,
+            diff,
+            step,
+            curve,
+        })
     }
 }
 
@@ -95,8 +185,8 @@ trait Monotonic<T, U> {
     fn monotonic_add(&mut self, k: T, v: U);
 }
 
-impl Monotonic<f64, f64> for Spline<f64, f64> {
-    fn monotonic_add(&mut self, k: f64, v: f64) {
+impl Monotonic<f32, f32> for Spline<f32, f32> {
+    fn monotonic_add(&mut self, k: f32, v: f32) {
         // check if key exists and update or add new key
         if let Some(key) = self.keys().iter().position(|&key| key.t == k) {
             *self.get_mut(key).unwrap().value = v;
@@ -111,58 +201,6 @@ impl Monotonic<f64, f64> for Spline<f64, f64> {
                 && ((key.value > v && key.t < k) || (key.value < v && key.t > k))
         }) {
             *self.get_mut(idx).unwrap().value = v;
-        }
-    }
-}
-
-fn sensor() -> Result<i32> {
-    Ok(
-        read_to_string("/sys/bus/iio/devices/iio:device0/in_illuminance_raw")?
-            .trim()
-            .parse()?,
-    )
-}
-
-struct Brightness {
-    requested: i32,
-    max: i32,
-}
-
-impl Brightness {
-    fn changed(&self) -> Result<bool> {
-        let diff = Self::get()? - self.requested;
-        Ok(diff != 0)
-    }
-
-    fn get() -> Result<i32> {
-        Ok(
-            read_to_string("/sys/class/backlight/intel_backlight/brightness")?
-                .trim()
-                .parse()?,
-        )
-    }
-
-    fn set(&mut self, val: i32) -> Result<()> {
-        write(
-            "/sys/class/backlight/intel_backlight/brightness",
-            val.to_string(),
-        )?;
-        self.requested = val;
-        Ok(())
-    }
-
-    fn get_max() -> Result<i32> {
-        Ok(
-            read_to_string("/sys/class/backlight/intel_backlight/max_brightness")?
-                .trim()
-                .parse()?,
-        )
-    }
-
-    fn new() -> Self {
-        Self {
-            requested: Self::get().unwrap(),
-            max: Self::get_max().unwrap(),
         }
     }
 }
