@@ -44,15 +44,15 @@ async fn main() -> Result<()> {
     let adjust_retain: JoinHandle<Result<()>> = spawn(async move {
         loop {
             if !backlight.changed().await? {
-                let d;
+                let duration;
                 if Backlight::get().await? != backlight.target {
                     backlight.adjust().await?;
-                    d = Duration::from_millis(TPF);
+                    duration = Duration::from_millis(TPF);
                 } else {
-                    d = Duration::from_millis(SAMPLE_INTERVAL_MS * 10);
+                    duration = Duration::from_millis(SAMPLE_INTERVAL_MS * 10);
                 }
                 backlight.prepare(avg.load(Ordering::Relaxed)).await?;
-                sleep(d).await;
+                sleep(duration).await;
             } else {
                 backlight.retain(avg.load(Ordering::Relaxed)).await?;
             }

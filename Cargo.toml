@@ -30,4 +30,6 @@ iced_lazy = "0.2.0"
 tokio = { version = "1.25.0", features = ["full", "tracing"] }
 console-subscriber = "0.1.8"
 tracing = "0.1.37"
+strum = { version = "0.24.1", features = ["derive"] }
+notify = { version = "5.1.0", default-features = false }
 # brightness = {version = "0.5.0", features = ["blocking"]}
