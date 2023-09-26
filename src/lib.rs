@@ -4,6 +4,7 @@ use strum::AsRefStr;
 
 use std::{fs::read_to_string, process::Child};
 
+pub mod curve;
 mod gui;
 
 #[derive(Deserialize, Serialize)]

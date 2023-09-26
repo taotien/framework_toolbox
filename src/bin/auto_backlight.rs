@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use anyhow::Result;
 use splines::{Interpolation, Key, Spline};
 use tokio::{
@@ -13,10 +15,13 @@ use std::{
     time::Duration,
 };
 
+use framework_toolbox::curve::{Monotonic, Sensor};
+
 const SAMPLE_SIZE: u32 = 100;
 const SAMPLE_INTERVAL_MS: u64 = 100;
 const FPS: u32 = 60;
 const TPF: u64 = 1000 / FPS as u64;
+const SENSOR_MAX: u32 = 3355;
 // const HISTERESIS: u32 = 5000;
 
 #[tokio::main]
@@ -25,17 +30,17 @@ async fn main() -> Result<()> {
     console_subscriber::init();
 
     let mut backlight = Backlight::new().await?;
-    let mut sensor = Sensor::new().await?;
-    let average = Arc::new(AtomicU32::new(Sensor::get().await?));
+    let mut sensor = Sensor::new(
+        "/sys/bus/iio/devices/iio:device0/in_illuminance_raw",
+        SENSOR_MAX / 2,
+    )?;
+    let average = Arc::new(AtomicU32::new(SENSOR_MAX / 2));
 
     let avg = average.clone();
     let sample: JoinHandle<Result<()>> = spawn(async move {
         loop {
-            sensor.sample().await?;
-            avg.store(
-                sensor.samples.iter().sum::<u32>() / SAMPLE_SIZE,
-                Ordering::Relaxed,
-            );
+            sensor.sample()?;
+            avg.store(sensor.average(), Ordering::Relaxed);
             sleep(Duration::from_millis(SAMPLE_INTERVAL_MS)).await;
         }
     });
@@ -61,31 +66,6 @@ async fn main() -> Result<()> {
 
     let _ = join![sample, adjust_retain];
     unreachable!()
-}
-
-struct Sensor {
-    samples: VecDeque<u32>,
-}
-
-impl Sensor {
-    async fn sample(&mut self) -> Result<()> {
-        self.samples.pop_front();
-        self.samples.push_back(Self::get().await?);
-        Ok(())
-    }
-
-    async fn get() -> Result<u32> {
-        Ok(
-            read_to_string("/sys/bus/iio/devices/iio:device0/in_illuminance_raw")
-                .await?
-                .trim()
-                .parse()?,
-        )
-    }
-    async fn new() -> Result<Self> {
-        let samples = VecDeque::from([Self::get().await?; SAMPLE_SIZE as usize]);
-        Ok(Self { samples })
-    }
 }
 
 struct Backlight {
@@ -126,7 +106,8 @@ impl Backlight {
         }
 
         self.requested = current;
-        self.curve.monotonic_add(s as f32, current as f32);
+        self.curve
+            .add(Key::new(s as f32, current as f32, Interpolation::default()));
         self.prepare(s).await?;
         Ok(())
     }
@@ -178,29 +159,5 @@ impl Backlight {
             step,
             curve,
         })
-    }
-}
-
-trait Monotonic<T, U> {
-    fn monotonic_add(&mut self, k: T, v: U);
-}
-
-impl Monotonic<f32, f32> for Spline<f32, f32> {
-    fn monotonic_add(&mut self, k: f32, v: f32) {
-        // check if key exists and update or add new key
-        if let Some(key) = self.keys().iter().position(|&key| key.t == k) {
-            *self.get_mut(key).unwrap().value = v;
-        } else {
-            let k = Key::new(k, v, Interpolation::default());
-            self.add(k);
-        }
-
-        // make keys with values in the wrong direction consistent
-        if let Some(idx) = self.keys().iter().position(|&key| {
-            (key.t != 0. && key.t != 3355.)
-                && ((key.value > v && key.t < k) || (key.value < v && key.t > k))
-        }) {
-            *self.get_mut(idx).unwrap().value = v;
-        }
     }
 }
