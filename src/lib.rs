@@ -9,7 +9,9 @@ mod gui;
 
 #[derive(Deserialize, Serialize)]
 pub struct Toolbox {
+    pub ectool_path: Option<String>,
     battery_limit: u8,
+    battery_limit_once: Option<u8>,
     fan_duty: u8,
     fan_auto: bool,
     backlight_auto: bool,
@@ -25,6 +27,7 @@ pub struct Toolbox {
 
 pub struct ToolboxDiff {
     pub battery_limit: Option<u8>,
+    pub battery_limit_once: Option<u8>,
     pub fan_duty: Option<u8>,
     pub fan_auto: Option<bool>,
     pub led_power: Option<Option<LedColor>>,
@@ -35,7 +38,9 @@ pub struct ToolboxDiff {
 impl Default for Toolbox {
     fn default() -> Self {
         Toolbox {
+            ectool_path: None,
             battery_limit: 69,
+            battery_limit_once: None,
             fan_duty: 42,
             fan_auto: true,
             backlight_auto: true,
@@ -65,6 +70,7 @@ impl Toolbox {
                     None
                 }
             },
+            battery_limit_once: { new.battery_limit_once },
             fan_duty: {
                 if self.fan_duty != new.fan_duty {
                     Some(new.fan_duty)

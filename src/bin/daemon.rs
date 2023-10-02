@@ -20,6 +20,7 @@ fn main() -> Result<()> {
     let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
 
     watcher.watch(&conf_path, RecursiveMode::Recursive).unwrap();
+    let ectool_path = Toolbox::parse()?.ectool_path;
     for res in rx {
         match res {
             Ok(event) => {
@@ -30,28 +31,29 @@ fn main() -> Result<()> {
                         conf_diff = conf_old.diff(&conf_new);
 
                         {
-                            if let Some(limit) = conf_diff.battery_limit {
-                                Ectool::FwChargeLimit(limit).call();
+                            if let Some(limit_once) = conf_diff.battery_limit_once {
+                                Ectool::FwChargeOnce(limit_once).call(&ectool_path);
+                            } else if let Some(limit) = conf_diff.battery_limit {
+                                Ectool::FwChargeLimit(limit).call(&ectool_path);
                             }
                             if let Some(duty) = conf_diff.fan_duty {
-                                Ectool::FanDuty(duty).call();
+                                Ectool::FanDuty(duty).call(&ectool_path);
                             }
                             if let Some(auto) = conf_diff.fan_auto {
                                 if auto {
-                                    Ectool::AutoFanCtrl.call();
+                                    Ectool::AutoFanCtrl.call(&ectool_path);
                                 }
                             }
                             if let Some(Some(color)) = conf_diff.led_power {
-                                Ectool::Led(LedSide::Power(color)).call();
+                                Ectool::Led(LedSide::Power(color)).call(&ectool_path);
                             }
                             if let Some(Some(color)) = conf_diff.led_left {
-                                Ectool::Led(LedSide::Left(color)).call();
+                                Ectool::Led(LedSide::Left(color)).call(&ectool_path);
                             }
                             if let Some(Some(color)) = conf_diff.led_right {
-                                Ectool::Led(LedSide::Right(color)).call();
+                                Ectool::Led(LedSide::Right(color)).call(&ectool_path);
                             }
                         }
-
                         conf_old = conf_new;
                     }
                 }
@@ -75,8 +77,14 @@ enum Ectool {
 }
 
 impl Ectool {
-    fn call(&self) {
-        let mut ectool = std::process::Command::new("ectool");
+    fn call(&self, path: &Option<String>) {
+        let mut ectool;
+        if let Some(p) = path {
+            ectool = std::process::Command::new(p);
+        } else {
+            ectool = std::process::Command::new("ectool");
+        }
+
         match self {
             Self::FwChargeLimit(v) => ectool.args([self.as_ref(), &format!("{}", v)]),
             Self::FwChargeOnce(v) => ectool.args([self.as_ref(), &format!("{}", v), "once"]),

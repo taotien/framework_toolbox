@@ -1,4 +1,4 @@
-use std::fs::{read_to_string, File};
+use std::fs::File;
 use std::io::Write;
 use std::process::Command;
 
@@ -71,9 +71,13 @@ impl Application for Toolbox {
     fn update(&mut self, message: Self::Message) -> iced::Command<Message> {
         match message {
             Message::BatteryLimitChanged(value) => {
-                self.battery_limit = value;
+                if self.battery_limit_once.is_none() {
+                    self.battery_limit = value;
+                }
             }
-            Message::BatteryOneShot => {}
+            Message::BatteryOneShot => {
+                self.battery_limit_once = Some(100);
+            }
             Message::FanDutyChanged(value) => {
                 self.fan_duty = value;
                 self.fan_auto = false;
