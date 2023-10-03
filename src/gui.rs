@@ -11,7 +11,7 @@ use iced::{
 };
 use iced_native::{window, Event};
 
-use crate::{LedColor, Toolbox};
+use crate::{LedColor, Toolbox, ToolboxFlags};
 
 #[derive(Clone, Debug)]
 pub enum Message {
@@ -31,7 +31,7 @@ impl Application for Toolbox {
     type Message = Message;
     type Executor = executor::Default;
     type Theme = Theme;
-    type Flags = ();
+    type Flags = ToolboxFlags;
 
     fn title(&self) -> String {
         String::from("Framework Toolbox")
@@ -45,7 +45,7 @@ impl Application for Toolbox {
         self.should_exit
     }
 
-    fn new(_flags: ()) -> (Toolbox, iced::Command<Message>) {
+    fn new(_flags: ToolboxFlags) -> (Toolbox, iced::Command<Message>) {
         // check for existing config, otherwise default
         let mut tb = Toolbox::parse().unwrap_or_default();
         if tb.backlight_auto {

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 
@@ -33,6 +34,14 @@ pub struct ToolboxDiff {
     pub led_power: Option<Option<LedColor>>,
     pub led_left: Option<Option<LedColor>>,
     pub led_right: Option<Option<LedColor>>,
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+#[derive(Default)]
+pub struct ToolboxFlags {
+    #[arg(short, long)]
+    debug: bool,
 }
 
 impl Default for Toolbox {
@@ -110,8 +119,9 @@ impl Toolbox {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, AsRefStr)]
+#[derive(Default, Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, AsRefStr)]
 pub enum LedColor {
+    #[default]
     Auto,
     White,
     Red,
@@ -120,12 +130,6 @@ pub enum LedColor {
     Yellow,
     Amber,
     Off,
-}
-
-impl Default for LedColor {
-    fn default() -> Self {
-        LedColor::Auto
-    }
 }
 
 impl LedColor {
