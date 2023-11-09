@@ -1,5 +1,7 @@
 # Framework Toolbox
 
+## _see the new backlight daemon, available at [taotien/prescurve](https://github.com/taotien/prescurve)!_
+
 ![image](https://user-images.githubusercontent.com/29749622/205031263-4783396d-02e0-4996-bc5a-693db567e131.png)
 
 Quick and dirty GUI for utilities of the Framework Laptop
