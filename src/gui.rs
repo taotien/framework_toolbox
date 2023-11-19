@@ -50,7 +50,7 @@ impl Application for Toolbox {
         let mut tb = Toolbox::parse().unwrap_or_default();
         if tb.backlight_auto {
             tb.backlight_daemon = Some(
-                Command::new("fwtb-ab")
+                Command::new("prescurve-backlight")
                     .spawn()
                     .expect("couldn't start autobacklight"),
             )
@@ -89,7 +89,7 @@ impl Application for Toolbox {
                 self.backlight_auto = value;
                 if self.backlight_auto {
                     self.backlight_daemon = Some(
-                        Command::new("fwtb-ab")
+                        Command::new("prescurve-backlight")
                             .spawn()
                             .expect("couldn't start autobacklight"),
                     )

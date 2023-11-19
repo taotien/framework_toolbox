@@ -13,9 +13,9 @@ path = "src/main.rs"
 name = "fwtbd"
 path = "src/bin/daemon.rs"
 
-[[bin]]
-name = "fwtb-ab"
-path = "src/bin/auto_backlight.rs"
+# [[bin]]
+# name = "fwtb-ab"
+# path = "src/bin/auto_backlight.rs"
 
 [dependencies]
 anyhow = "1.0.66"
