@@ -71,9 +71,8 @@ impl Application for Toolbox {
     fn update(&mut self, message: Self::Message) -> iced::Command<Message> {
         match message {
             Message::BatteryLimitChanged(value) => {
-                if self.battery_limit_once.is_none() {
-                    self.battery_limit = value;
-                }
+                self.battery_limit_once = None;
+                self.battery_limit = value;
             }
             Message::BatteryOneShot => {
                 self.battery_limit_once = Some(100);

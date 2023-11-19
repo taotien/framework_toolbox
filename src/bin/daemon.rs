@@ -24,7 +24,6 @@ fn main() -> Result<()> {
     for res in rx {
         match res {
             Ok(event) => {
-                println!("event: {:?}", event);
                 if let EventKind::Access(AccessKind::Close(mode)) = event.kind {
                     if mode == AccessMode::Write {
                         let conf_new = Toolbox::parse().unwrap();
@@ -100,7 +99,9 @@ impl Ectool {
                 },
             ]),
         };
-        ectool.output().unwrap();
+        let output = ectool.output().unwrap();
+        // println!("{}", String::from_utf8_lossy(&output.stdout));
+        // println!("{}", String::from_utf8_lossy(&output.stderr));
     }
 }
 
