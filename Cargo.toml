@@ -8,5 +8,7 @@ anyhow = "1.0.81"
 dirs = "5.0.1"
 iced = { version = "0.12.1", features = ["tokio"] }
 serde = { version = "1.0.197", features = ["derive"] }
-strum = "0.26.2"
+strum = { version = "0.26.2", features = ["derive"] }
+tokio = { version = "1.36.0", features = ["full"] }
+toml = "0.8.11"
 
