@@ -4,9 +4,10 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 
+mod ectool;
 mod gui;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Toolbox {
     battery_limit: u8,
     fan_duty: u8,
@@ -15,6 +16,13 @@ pub struct Toolbox {
     led_power: Option<LedColor>,
     led_left: Option<LedColor>,
     led_right: Option<LedColor>,
+
+    #[serde(skip)]
+    applied: bool,
+    #[serde(skip)]
+    battery_oneshot_applied: bool,
+    #[serde(skip)]
+    error: bool,
 }
 
 impl Default for Toolbox {
@@ -27,6 +35,9 @@ impl Default for Toolbox {
             led_power: Some(LedColor::default()),
             led_left: Some(LedColor::default()),
             led_right: Some(LedColor::default()),
+            applied: false,
+            battery_oneshot_applied: false,
+            error: false,
         }
     }
 }

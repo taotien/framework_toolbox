@@ -1,3 +1,4 @@
+use anyhow::Result;
 use iced::{
     alignment, executor,
     widget::{
@@ -7,7 +8,10 @@ use iced::{
     Alignment, Application, Color, Element, Length, Theme,
 };
 
-use crate::{LedColor, Toolbox};
+use crate::{
+    ectool::{Ectool, LedSide},
+    LedColor, Toolbox,
+};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -18,6 +22,7 @@ pub enum Message {
     LedPowerSelected(LedColor),
     LedLeftSelected(LedColor),
     LedRightSelected(LedColor),
+    // Applied,
     Apply,
 }
 
@@ -69,11 +74,20 @@ impl Application for Toolbox {
     }
 
     fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
+        self.applied = false;
         match message {
             Message::BatteryLimitChanged(value) => {
                 self.battery_limit = value;
+                self.battery_oneshot_applied = false;
             }
-            Message::BatteryOneShot => {}
+            Message::BatteryOneShot => {
+                match Ectool::FwChargeOnce(100).call() {
+                    Ok(()) => self.battery_oneshot_applied = true,
+                    Err(_) => {
+                        self.error = true;
+                    }
+                };
+            }
             Message::FanDutyChanged(value) => {
                 self.fan_duty = value;
                 self.fan_auto = false;
@@ -90,7 +104,35 @@ impl Application for Toolbox {
             Message::LedRightSelected(value) => {
                 self.led_right = Some(value);
             }
-            Message::Apply => {}
+            // Message::Applied => {
+            //     self.applied = true;
+            // }
+            Message::Apply => {
+                // lmao this is so cursed
+                let result = || -> Result<()> {
+                    Ectool::FwChargeLimit(self.battery_limit).call()?;
+                    if self.fan_auto {
+                        Ectool::AutoFanCtrl.call()?;
+                    } else {
+                        Ectool::FanDuty(self.fan_duty).call()?;
+                    }
+                    if let Some(color) = self.led_power {
+                        Ectool::Led(LedSide::Power(color)).call()?;
+                    }
+                    if let Some(color) = self.led_left {
+                        Ectool::Led(LedSide::Left(color)).call()?;
+                    }
+                    if let Some(color) = self.led_right {
+                        Ectool::Led(LedSide::Right(color)).call()?;
+                    }
+                    Ok(())
+                };
+                match result() {
+                    Ok(()) => self.applied = true,
+                    Err(_) => self.error = true,
+                }
+                // return iced::Command::perform(apply(self.clone()), |_| Message::Applied);
+            }
         }
         iced::Command::none()
     }
@@ -111,7 +153,12 @@ impl Application for Toolbox {
             ],
             row![
                 Space::with_width(Length::Fill),
-                button("100% once").on_press(Message::BatteryOneShot),
+                button(if self.battery_oneshot_applied {
+                    "Applied!"
+                } else {
+                    "100% once"
+                })
+                .on_press(Message::BatteryOneShot),
             ]
             .padding(SPACE)
         ]
@@ -178,7 +225,14 @@ impl Application for Toolbox {
             fan_controls,
             led_controls,
             horizontal_space(),
-            button("Apply").on_press(Message::Apply)
+            button(if self.applied {
+                "Applied!"
+            } else if self.error {
+                "Error!"
+            } else {
+                "Apply"
+            })
+            .on_press(Message::Apply)
         ]
         .align_items(Alignment::Center)
         .spacing(SPACE)
@@ -188,3 +242,9 @@ impl Application for Toolbox {
         container(content).center_x().into()
     }
 }
+
+// async fn apply(tb: Toolbox) {
+//     if let Some(prev) = tb.prev {
+
+//     }
+// }
