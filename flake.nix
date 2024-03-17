@@ -8,6 +8,7 @@
     self,
     nixpkgs,
     flake-utils,
+    ...
   }:
     flake-utils.lib.eachDefaultSystem
     (system: let
@@ -16,7 +17,7 @@
       with pkgs; rec {
         devShell = mkShell rec {
           buildInputs = [
-            libxkgcommon
+            libxkbcommon
             libGL
 
             wayland

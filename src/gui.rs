@@ -2,7 +2,7 @@ use iced::{
     alignment, executor,
     widget::{
         button, column, container, horizontal_rule, horizontal_space, pick_list, row, slider, text,
-        toggler,
+        toggler, Space,
     },
     Alignment, Application, Color, Element, Length, Theme,
 };
@@ -18,7 +18,10 @@ pub enum Message {
     LedPowerSelected(LedColor),
     LedLeftSelected(LedColor),
     LedRightSelected(LedColor),
+    Apply,
 }
+
+const SPACE: u16 = 10;
 
 macro_rules! slider_block {
     ($left:expr, $middle:expr, $right:expr) => {
@@ -31,6 +34,7 @@ macro_rules! slider_block {
                 .horizontal_alignment(alignment::Horizontal::Left)
                 .width(Length::Fill),
         ]
+        .spacing(SPACE)
     };
 }
 
@@ -39,7 +43,7 @@ macro_rules! width_align_spacing_map {
         $($x
             .width(Length::Fill)
             .align_items(Alignment::Center)
-            // .spacing(10)
+            .spacing(SPACE)
         ), *
     };
 }
@@ -86,22 +90,17 @@ impl Application for Toolbox {
             Message::LedRightSelected(value) => {
                 self.led_right = Some(value);
             }
+            Message::Apply => {}
         }
         iced::Command::none()
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
-        let space = 10;
-
-        let title = column![
-            text("Framework Toolbox")
-                .width(Length::Fill)
-                .size(42)
-                .style(Color::from_rgb(0.5, 0.5, 0.5))
-                .horizontal_alignment(alignment::Horizontal::Center),
-            horizontal_rule(5),
-            horizontal_space(),
-        ];
+        let title = text("Framework Toolbox")
+            .width(Length::Fill)
+            .size(35)
+            .style(Color::from_rgb(0.5, 0.5, 0.5))
+            .horizontal_alignment(alignment::Horizontal::Center);
 
         let battery_controls = column![
             text(format!("Battery Limit: {}%", self.battery_limit)),
@@ -111,17 +110,20 @@ impl Application for Toolbox {
                 text("100%")
             ],
             row![
-                text("Charge to 100% once:").width(Length::Fill),
-                button("100%").on_press(Message::BatteryOneShot)
+                Space::with_width(Length::Fill),
+                button("100% once").on_press(Message::BatteryOneShot),
             ]
-        ];
+            .padding(SPACE)
+        ]
+        .align_items(Alignment::Center)
+        .spacing(SPACE);
 
         let fan_controls = column![
             text(format!("Fan Duty: {}", {
                 if self.fan_auto {
-                    "Auto"
+                    "Auto".to_string()
                 } else {
-                    stringify!("{}%", self.fan_duty)
+                    format!("{}%", self.fan_duty)
                 }
             })),
             slider_block![
@@ -129,38 +131,59 @@ impl Application for Toolbox {
                 slider(0..=100, self.fan_duty, Message::FanDutyChanged),
                 text("100%")
             ],
-            toggler("Auto".to_string(), self.fan_auto, Message::FanAutoToggled)
-                .text_alignment(alignment::Horizontal::Right)
-        ];
-
-        let led_controls = width_align_spacing_map!(row![
-            column![
-                text("Left"),
-                pick_list(&LedColor::ALL[..], self.led_left, Message::LedLeftSelected)
-            ],
-            column![
-                text("Power"),
-                pick_list(
-                    &LedColor::ALL[..],
-                    self.led_power,
-                    Message::LedPowerSelected
-                )
-            ],
-            column![
-                text("Right"),
-                pick_list(
-                    &LedColor::ALL[..],
-                    self.led_right,
-                    Message::LedRightSelected
-                )
+            row![
+                Space::with_width(Length::Fill),
+                toggler("Auto".to_string(), self.fan_auto, Message::FanAutoToggled)
+                    .width(Length::Shrink)
+                    .spacing(SPACE)
             ]
-        ]);
+            .padding(SPACE)
+        ]
+        .align_items(Alignment::Center)
+        .spacing(SPACE);
 
-        let content: Element<_> = column![title, battery_controls, fan_controls, led_controls]
-            .spacing(space)
-            .padding(space)
-            .align_items(Alignment::Center)
-            .into();
+        let led_controls = column![
+            text("LED Colors"),
+            width_align_spacing_map!(row![
+                column![
+                    text("Left"),
+                    pick_list(&LedColor::ALL[..], self.led_left, Message::LedLeftSelected)
+                ],
+                column![
+                    text("Power"),
+                    pick_list(
+                        &LedColor::ALL[..],
+                        self.led_power,
+                        Message::LedPowerSelected
+                    )
+                ],
+                column![
+                    text("Right"),
+                    pick_list(
+                        &LedColor::ALL[..],
+                        self.led_right,
+                        Message::LedRightSelected
+                    )
+                ]
+            ])
+            .width(Length::Shrink)
+        ]
+        .align_items(Alignment::Center);
+
+        let content: Element<_> = column![
+            title,
+            horizontal_rule(5),
+            horizontal_space(),
+            battery_controls,
+            fan_controls,
+            led_controls,
+            horizontal_space(),
+            button("Apply").on_press(Message::Apply)
+        ]
+        .align_items(Alignment::Center)
+        .spacing(SPACE)
+        .padding(SPACE)
+        .into();
 
         container(content).center_x().into()
     }
