@@ -17,6 +17,11 @@
       with pkgs; rec {
         devShell = mkShell rec {
           buildInputs = [
+            # expat
+            # fontconfig
+            # freetype
+            # freetype.dev
+
             libxkbcommon
             libGL
 
